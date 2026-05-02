@@ -23,15 +23,28 @@
             <form id="triageForm" class="space-y-6">
                 <div>
                     <h3 class="text-lg font-semibold text-gray-900 mb-4"><i class="fa-solid fa-user mr-2"></i>Your Information</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                             <input type="text" id="patientName" name="name" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Enter your full name" required>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                            <input type="tel" id="patientPhone" name="phone" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="(555) 123-4567" inputmode="numeric" pattern="[0-9]*" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Age</label>
+                            <input type="number" id="patientAge" name="age" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Your age" min="1" max="150" required>
                         </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                            <select name="gender" id="patientGender" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
+                                <option value="">Select...</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                        <input type="tel" id="patientPhone" name="phone" class="w-full md:w-1/2 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="(555) 123-4567" inputmode="numeric" pattern="[0-9]*" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
                     </div>
                 </div>
 
@@ -141,13 +154,13 @@
                         <div class="flex gap-4">
                             <label class="cursor-pointer flex-1 breathing-yes">
                                 <input type="radio" name="breathing_trouble" value="yes" class="hidden">
-                                <div class="px-6 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all font-medium" onclick="selectBreathing('yes')">
+                                <div class="px-6 py-3 bg-blue-50 border-2 border-blue-500 rounded-lg text-center hover:border-blue-600 transition-all font-medium text-blue-700" onclick="selectBreathing('yes')">
                                     <i class="fa-solid fa-circle-xmark mr-2"></i> Yes
                                 </div>
                             </label>
                             <label class="cursor-pointer flex-1 breathing-no">
                                 <input type="radio" name="breathing_trouble" value="no" class="hidden" checked onclick="selectBreathing('no')">
-                                <div class="px-6 py-3 bg-green-50 border-2 border-green-500 rounded-lg text-center hover:border-blue-500 transition-all font-medium text-green-700">
+                                <div class="px-6 py-3 bg-blue-50 border-2 border-blue-500 rounded-lg text-center hover:border-blue-600 transition-all font-medium text-blue-700">
                                     <i class="fa-solid fa-circle-check mr-2"></i> No
                                 </div>
                             </label>
@@ -168,7 +181,7 @@
                             </label>
                             <label class="cursor-pointer flex-1 family-history-no">
                                 <input type="radio" name="family_history" value="no" class="hidden" checked onclick="selectFamilyHistory('no')">
-                                <div class="px-6 py-3 bg-green-50 border-2 border-green-500 rounded-lg text-center hover:border-blue-500 transition-all font-medium text-green-700">
+                                <div class="px-6 py-3 bg-blue-50 border-2 border-blue-500 rounded-lg text-center hover:border-blue-600 transition-all font-medium text-blue-700">
                                     <i class="fa-solid fa-circle-check mr-2"></i> No
                                 </div>
                             </label>
@@ -189,7 +202,7 @@
                             </label>
                             <label class="cursor-pointer flex-1 substance-no">
                                 <input type="radio" name="substance_use" value="no" class="hidden" checked onclick="selectSubstance('no')">
-                                <div class="px-6 py-3 bg-green-50 border-2 border-green-500 rounded-lg text-center hover:border-blue-500 transition-all font-medium text-green-700">
+                                <div class="px-6 py-3 bg-blue-50 border-2 border-blue-500 rounded-lg text-center hover:border-blue-600 transition-all font-medium text-blue-700">
                                     <i class="fa-solid fa-circle-check mr-2"></i> No
                                 </div>
                             </label>
@@ -210,7 +223,7 @@
                             </label>
                             <label class="cursor-pointer flex-1 sexually-active-no">
                                 <input type="radio" name="sexually_active" value="no" class="hidden" checked onclick="selectSexuallyActive('no')">
-                                <div class="px-6 py-3 bg-green-50 border-2 border-green-500 rounded-lg text-center hover:border-blue-500 transition-all font-medium text-green-700">
+                                <div class="px-6 py-3 bg-blue-50 border-2 border-blue-500 rounded-lg text-center hover:border-blue-600 transition-all font-medium text-blue-700">
                                     <i class="fa-solid fa-circle-check mr-2"></i> No
                                 </div>
                             </label>
@@ -269,14 +282,14 @@
                 r.checked = (r.value === value);
                 const label = r.closest('label');
                 const box = label.querySelector('div');
-                box.classList.remove('bg-red-50', 'bg-green-50', 'border-red-500', 'border-green-500', 'text-red-600', 'text-green-700', 'border-gray-200');
+                box.classList.remove('bg-blue-50', 'bg-white', 'border-blue-500', 'border-gray-200', 'text-blue-700');
                 box.classList.add('bg-white', 'border-gray-200');
                 if (value === 'yes' && r.value === 'yes') {
                     box.classList.remove('bg-white', 'border-gray-200');
-                    box.classList.add('bg-red-50', 'border-red-500', 'text-red-600');
+                    box.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
                 } else if (value === 'no' && r.value === 'no') {
                     box.classList.remove('bg-white', 'border-gray-200');
-                    box.classList.add('bg-green-50', 'border-green-500', 'text-green-700');
+                    box.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
                 }
             });
         }
@@ -286,14 +299,14 @@
                 r.checked = (r.value === value);
                 const label = r.closest('label');
                 const box = label.querySelector('div');
-                box.classList.remove('bg-red-50', 'bg-green-50', 'border-red-500', 'border-green-500', 'text-red-600', 'text-green-700', 'border-gray-200');
+                box.classList.remove('bg-blue-50', 'bg-white', 'border-blue-500', 'border-gray-200', 'text-blue-700');
                 box.classList.add('bg-white', 'border-gray-200');
                 if (value === 'yes' && r.value === 'yes') {
                     box.classList.remove('bg-white', 'border-gray-200');
-                    box.classList.add('bg-red-50', 'border-red-500', 'text-red-600');
+                    box.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
                 } else if (value === 'no' && r.value === 'no') {
                     box.classList.remove('bg-white', 'border-gray-200');
-                    box.classList.add('bg-green-50', 'border-green-500', 'text-green-700');
+                    box.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
                 }
             });
         }
@@ -303,14 +316,14 @@
                 r.checked = (r.value === value);
                 const label = r.closest('label');
                 const box = label.querySelector('div');
-                box.classList.remove('bg-red-50', 'bg-green-50', 'border-red-500', 'border-green-500', 'text-red-600', 'text-green-700', 'border-gray-200');
+                box.classList.remove('bg-blue-50', 'bg-white', 'border-blue-500', 'border-gray-200', 'text-blue-700');
                 box.classList.add('bg-white', 'border-gray-200');
                 if (value === 'yes' && r.value === 'yes') {
                     box.classList.remove('bg-white', 'border-gray-200');
-                    box.classList.add('bg-red-50', 'border-red-500', 'text-red-600');
+                    box.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
                 } else if (value === 'no' && r.value === 'no') {
                     box.classList.remove('bg-white', 'border-gray-200');
-                    box.classList.add('bg-green-50', 'border-green-500', 'text-green-700');
+                    box.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
                 }
             });
         }
@@ -320,14 +333,14 @@
                 r.checked = (r.value === value);
                 const label = r.closest('label');
                 const box = label.querySelector('div');
-                box.classList.remove('bg-red-50', 'bg-green-50', 'border-red-500', 'border-green-500', 'text-red-600', 'text-green-700', 'border-gray-200');
+                box.classList.remove('bg-blue-50', 'bg-white', 'border-blue-500', 'border-gray-200', 'text-blue-700');
                 box.classList.add('bg-white', 'border-gray-200');
                 if (value === 'yes' && r.value === 'yes') {
                     box.classList.remove('bg-white', 'border-gray-200');
-                    box.classList.add('bg-red-50', 'border-red-500', 'text-red-600');
+                    box.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
                 } else if (value === 'no' && r.value === 'no') {
                     box.classList.remove('bg-white', 'border-gray-200');
-                    box.classList.add('bg-green-50', 'border-green-500', 'text-green-700');
+                    box.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
                 }
             });
         }
@@ -374,6 +387,8 @@
             
             const data = {
                 name: formData.get('name'),
+                age: formData.get('age'),
+                gender: formData.get('gender'),
                 phone: formData.get('phone'),
                 symptoms: symptoms,
                 duration: formData.get('duration'),
@@ -441,6 +456,9 @@
                             </button>
                         </div>
                     </div>
+                    <button onclick="markArrived('${result.patient_id || ''}', '${result.name || 'Patient'}', '${result.queue_number || '1'}')" class="w-full mt-4 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                        <i class="fa-solid fa-hand-wave mr-2"></i>I'm Here - Check In
+                    </button>
                     <p class="text-gray-500 text-sm mt-4">For further inquiries, call: <strong>1-800-HELP-NOW</strong></p>
                 `;
             } else if (category === 'attention') {
@@ -450,7 +468,10 @@
                         <p class="font-semibold text-yellow-800"><i class="fa-solid fa-map-marker-alt mr-2"></i>Nearest Clinic Directions</p>
                         <p class="text-sm text-yellow-700">Head to the nearest walk-in clinic. Expected wait: 1-2 hours.</p>
                     </div>
-                    <p class="text-gray-500 text-sm">For further inquiries, call: <strong>1-800-HELP-NOW</strong></p>
+                    <button onclick="markArrived('${result.patient_id || ''}', '${result.name || 'Patient'}', '${result.queue_number || '1'}')" class="w-full mt-4 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                        <i class="fa-solid fa-hand-wave mr-2"></i>I'm Here - Check In
+                    </button>
+                    <p class="text-gray-500 text-sm mt-4">For further inquiries, call: <strong>1-800-HELP-NOW</strong></p>
                 `;
             } else {
                 content = `
@@ -472,11 +493,48 @@
             document.getElementById('resultContent').innerHTML = content;
             document.getElementById('resultModal').classList.remove('hidden');
             document.getElementById('resultModal').classList.add('flex');
+            
+            // Store patient ID for "I'm Here" button
+            currentPatientId = result.patient_id;
         }
 
         function closeResult() {
             document.getElementById('resultModal').classList.add('hidden');
             document.getElementById('resultModal').classList.remove('flex');
+        }
+
+        let currentPatientId = null;
+
+        function markArrived(patientId, patientName, queueNumber) {
+            fetch('/api/mark-arrived', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ patient_id: patientId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const content = `
+                        <div class="text-center">
+                            <div class="w-16 h-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-4 text-4xl">
+                                <i class="fa-solid fa-check"></i>
+                            </div>
+                            <p class="text-xl font-bold text-green-600 mb-2">You're Checked In!</p>
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                <p class="font-semibold text-blue-800">Queue Number: #${queueNumber}</p>
+                                <p class="text-sm text-blue-700">${patientName}, please have a seat in the waiting area.</p>
+                                <p class="text-sm text-blue-700 mt-2">A nurse will call your name when ready.</p>
+                            </div>
+                            <p class="text-gray-500 text-sm">For further inquiries, call: <strong>1-800-HELP-NOW</strong></p>
+                        </div>
+                    `;
+                    document.getElementById('resultContent').innerHTML = content;
+                }
+            })
+            .catch(err => {
+                console.error('Error marking arrived:', err);
+                alert('Error checking in. Please try again.');
+            });
         }
 
         function callAmbulance() {

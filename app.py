@@ -178,6 +178,12 @@ def all_patients_page():
         return redirect('/login')
     return render_template('all_patients.html', user_role=session.get('user_role'))
 
+@app.route('/waiting-room')
+def waiting_room_page():
+    if not require_login():
+        return redirect('/login')
+    return render_template('waiting_room.html', user_role=session.get('user_role'))
+
 @app.route('/bed-qr')
 def bed_qr_page():
     if not require_login():
@@ -380,6 +386,8 @@ def submit_triage():
     
     patient = {
         'name': data.get('name', 'Anonymous'),
+        'age': data.get('age', 0),
+        'gender': data.get('gender', ''),
         'phone': data.get('phone', ''),
         'symptoms': symptoms,
         'duration': duration,
@@ -411,8 +419,63 @@ def submit_triage():
     return jsonify({
         'success': True,
         'patient': patient,
-        'category': triage_category
+        'category': triage_category,
+        'patient_id': str(patient['_id']),
+        'name': patient['name'],
+        'queue_number': patients_collection.count_documents({'status': {'$ne': 'discharged'}}) + 1
     })
+
+@app.route('/api/mark-arrived', methods=['POST'])
+def mark_arrived():
+    data = request.json
+    patient_id = data.get('patient_id')
+    
+    if not patient_id:
+        return jsonify({'success': False, 'error': 'Patient ID required'})
+    
+    # Count arrived patients for queue number
+    arrived_count = patients_collection.count_documents({
+        'arrived': True,
+        'status': {'$ne': 'discharged'}
+    })
+    
+    patients_collection.update_one(
+        {'_id': ObjectId(patient_id)},
+        {'$set': {
+            'arrived': True,
+            'arrival_time': datetime.now(),
+            'queue_number': arrived_count + 1,
+            'status': 'arrived'
+        }}
+    )
+    
+    return jsonify({'success': True, 'queue_number': arrived_count + 1})
+
+@app.route('/api/arrived-patients', methods=['GET'])
+def get_arrived_patients():
+    arrived = list(patients_collection.find({
+        'arrived': True,
+        'status': {'$ne': 'discharged'}
+    }).sort('queue_number', 1))
+    
+    for p in arrived:
+        p['_id'] = str(p['_id'])
+        p['arrival_time'] = p.get('arrival_time').isoformat() if p.get('arrival_time') else None
+        p['check_in_time'] = p.get('check_in_time').isoformat() if p.get('check_in_time') else None
+    
+    return jsonify(arrived)
+
+@app.route('/api/call-patient/<patient_id>', methods=['POST'])
+def call_patient():
+    data = request.json
+    patient_id = data.get('patient_id')
+    
+    patients_collection.update_one(
+        {'_id': ObjectId(patient_id)},
+        {'$set': {'called': True, 'called_at': datetime.now()}}
+    )
+    
+    return jsonify({'success': True})
 
 @app.route('/api/auto-assign/<patient_id>', methods=['POST'])
 def auto_assign(patient_id):
