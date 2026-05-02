@@ -138,7 +138,10 @@ function renderBeds(beds) {
             </div>
             <div class="grid grid-cols-6 sm:grid-cols-8 gap-2">
                 ${wingBeds.map(b => `
-                    <div class="h-12 rounded-lg flex items-center justify-center text-xs font-semibold cursor-pointer hover:scale-105 transition-transform ${getBedClass(b.status)}" title="Bed ${b.bed_number} - ${b.type}">
+                    <div class="h-12 rounded-lg flex items-center justify-center text-xs font-semibold cursor-pointer hover:scale-105 transition-transform ${getBedClass(b.status)}" 
+                        title="Bed ${b.bed_number} - ${b.type}"
+                        onclick="${b.status === 'occupied' ? `showBedPatient('${b._id}', '${b.bed_number}')` : ''}"
+                        ${b.status === 'occupied' ? 'style="cursor:pointer"' : ''}>
                         ${b.bed_number}
                     </div>
                 `).join('')}
@@ -154,6 +157,78 @@ function getBedClass(status) {
         cleaning: 'bg-amber-100 text-amber-700 border-2 border-amber-400'
     };
     return classes[status] || 'bg-gray-100 text-gray-700 border-2 border-gray-300';
+}
+
+async function showBedPatient(bedId, bedNumber) {
+    try {
+        const response = await fetch('/api/beds');
+        const beds = await response.json();
+        const bed = beds.find(b => b._id === bedId);
+        
+        if (!bed || !bed.patient_info) {
+            alert('No patient in this bed');
+            return;
+        }
+        
+        const p = bed.patient_info;
+        const categoryColors = {
+            simple: 'bg-green-100 text-green-700',
+            attention: 'bg-yellow-100 text-yellow-700',
+            emergency: 'bg-orange-100 text-orange-700',
+            critical: 'bg-red-100 text-red-700'
+        };
+        
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-900"><i class="fa-solid fa-bed mr-2"></i>Bed ${bedNumber}</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fa-solid fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <div class="font-semibold text-gray-900">Patient: ${p.name}</div>
+                        <div class="text-sm text-gray-600">Phone: ${p.phone || 'N/A'}</div>
+                        <div class="mt-2">
+                            <span class="px-3 py-1 rounded-full text-sm font-medium ${categoryColors[p.triage_category] || 'bg-gray-100'}">
+                                ${p.triage_category ? p.triage_category.charAt(0).toUpperCase() + p.triage_category.slice(1) : 'Unknown'}
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="font-semibold text-gray-700 mb-1">Symptoms:</div>
+                        <div class="text-sm text-gray-600">${p.symptoms && p.symptoms.length > 0 ? p.symptoms.join(', ') : 'None listed'}</div>
+                    </div>
+                    <div>
+                        <div class="font-semibold text-gray-700 mb-1">Status:</div>
+                        <div class="text-sm text-gray-600 capitalize">${p.status || 'Unknown'}</div>
+                    </div>
+                    <div>
+                        <div class="font-semibold text-gray-700 mb-1">Treating Doctors:</div>
+                        <div class="text-sm text-gray-600">${p.doctors && p.doctors.length > 0 ? p.doctors.join(', ') : 'None assigned'}</div>
+                    </div>
+                    <div>
+                        <div class="font-semibold text-gray-700 mb-1">Treating Nurses:</div>
+                        <div class="text-sm text-gray-600">${p.nurses && p.nurses.length > 0 ? p.nurses.join(', ') : 'None assigned'}</div>
+                    </div>
+                    <div>
+                        <div class="font-semibold text-gray-700 mb-1">Check-in Time:</div>
+                        <div class="text-sm text-gray-600">${p.check_in_time ? new Date(p.check_in_time).toLocaleString() : 'Unknown'}</div>
+                    </div>
+                </div>
+                <button onclick="this.closest('.fixed').remove()" class="mt-4 w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium">
+                    Close
+                </button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    } catch (error) {
+        console.error('Error loading patient info:', error);
+        alert('Error loading patient info');
+    }
 }
 
 async function loadStaff() {
@@ -206,12 +281,46 @@ function openAssignModal(patientId) {
     selectedBed = null;
     selectedStaff = null;
     
-    document.getElementById('modalTitle').textContent = 'Assign Resources';
+    document.getElementById('modalTitle').textContent = 'Assign Patient';
     document.getElementById('assignModal').classList.remove('hidden');
     document.getElementById('assignModal').classList.add('flex');
     
-    loadAvailableBeds();
-    loadAvailableStaff();
+    loadManualBedSelection();
+}
+
+async function loadManualBedSelection() {
+    try {
+        const response = await fetch('/api/beds');
+        const beds = await response.json();
+        const available = beds.filter(b => b.status === 'available');
+        
+        const container = document.getElementById('manualBedSelection');
+        if (available.length === 0) {
+            container.innerHTML = '<div class="col-span-4 text-center py-2 text-gray-400">No beds available</div>';
+            return;
+        }
+        
+        container.innerHTML = available.map(b => `
+            <button type="button" class="px-2 py-2 border-2 border-gray-200 rounded-lg text-xs hover:border-blue-500 transition-all ${selectedBed === b._id ? 'bg-blue-600 text-white border-blue-600' : ''}"
+                    onclick="selectManualBed('${b._id}', this)"
+                    data-bed-number="${b.bed_number}">
+                <div class="font-medium">${b.bed_number}</div>
+                <div class="text-xs opacity-75">${b.wing}</div>
+            </button>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading beds:', error);
+    }
+}
+
+function selectManualBed(bedId, element) {
+    selectedBed = bedId;
+    document.querySelectorAll('#manualBedSelection button').forEach(btn => {
+        btn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+        btn.classList.add('border-gray-200');
+    });
+    element.classList.remove('border-gray-200');
+    element.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
 }
 
 function closeModal() {
@@ -293,7 +402,36 @@ async function confirmAssignment() {
     }
     
     try {
-        if (selectedBed) {
+        await fetch(`/api/auto-assign/${selectedPatient}`, { method: 'POST' });
+        
+        closeModal();
+        loadPatients();
+        loadBeds();
+        loadStaff();
+        loadStats();
+    } catch (error) {
+        console.error('Error assigning resources:', error);
+        alert('Error assigning resources');
+    }
+}
+
+async function manualAssign() {
+    if (!selectedPatient) {
+        alert('Please select a patient');
+        return;
+    }
+    
+    if (!selectedBed) {
+        alert('Please select a bed manually');
+        return;
+    }
+    
+    try {
+        const bedsRes = await fetch('/api/beds');
+        const beds = await bedsRes.json();
+        const selectedBedData = beds.find(b => b._id === selectedBed);
+        
+        if (selectedBedData) {
             await fetch('/api/assign-bed', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

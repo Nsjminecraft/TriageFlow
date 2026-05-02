@@ -17,12 +17,17 @@
                 <span>TriageFlow</span>
             </div>
             <div class="flex items-center gap-2">
-                <a href="/" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-gauge mr-2"></i>Dashboard</a>
-                <a href="/patient-intake" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-user-plus mr-2"></i>Patient Intake</a>
+                <a href="/dashboard" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-gauge mr-2"></i>Dashboard</a>
+                
+                <a href="/my-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-user-injured mr-2"></i>My Patients</a>
                 <a href="/staff" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users mr-2"></i>Staff</a>
                 <a href="/condition-x" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-virus mr-2"></i>Condition X</a>
+                {% if user_role == 'Admin' %}
                 <a href="/settings" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"><i class="fa-solid fa-cog mr-2"></i>Settings</a>
+                {% endif %}
+                <a href="/bed-qr" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-qrcode mr-2"></i>Bed QR</a>
                 <a href="/all-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users-list mr-2"></i>All Patients</a>
+                <a href="/logout" class="px-4 py-2 rounded-lg text-red-600 hover:bg-red-50 font-medium"><i class="fa-solid fa-sign-out mr-2"></i>Logout</a>
             </div>
         </div>
     </nav>
@@ -84,8 +89,9 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4"><i class="fa-solid fa-user-md mr-2"></i>Staff Management</h2>
+        <div id="staffManagementSection" class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+            <div id="staffManagementContent">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4"><i class="fa-solid fa-user-md mr-2"></i>Staff Management <span class="text-xs text-red-500">(Admin Only)</span></h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Staff Name</label>
@@ -128,6 +134,34 @@
             </div>
         </div>
 
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4"><i class="fa-solid fa-user-shield mr-2"></i>Admin / Manager IDs</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Admin Name</label>
+                    <input type="text" id="adminName" placeholder="Hospital Manager" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Admin ID</label>
+                    <input type="text" id="adminId" placeholder="e.g., ADMIN002" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="adminPassword" placeholder="Enter password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+                <div class="flex items-end">
+                    <button onclick="addAdmin()" class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium">
+                        <i class="fa-solid fa-plus mr-2"></i>Add Admin
+                    </button>
+                </div>
+            </div>
+            <div id="adminList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-48 overflow-y-auto">
+                <div class="text-center py-4 text-gray-500 col-span-3">Loading admins...</div>
+            </div>
+        </div>
+
         <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
             <h2 class="text-lg font-semibold text-gray-900 mb-4"><i class="fa-solid fa-layer-group mr-2"></i>Current Bed Layout</h2>
             <div id="bedLayout" class="grid grid-cols-1 gap-4">
@@ -140,6 +174,25 @@
         let wings = [];
         let allBeds = [];
         let allStaff = [];
+        let allAdmins = [];
+        let currentUserRole = 'staff';
+
+        async function checkAdminRole() {
+            try {
+                const response = await fetch('/api/logged-in-user');
+                const user = await response.json();
+                currentUserRole = user.login_type;
+                
+                const staffSection = document.getElementById('staffManagementSection');
+                if (currentUserRole !== 'admin') {
+                    staffSection.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error checking role:', error);
+            }
+        }
+
+        checkAdminRole();
 
         async function loadWings() {
             try {
@@ -149,8 +202,79 @@
                 updateWingSelect();
                 loadBedLayout();
                 loadStaff();
+                loadAdmins();
             } catch (error) {
                 console.error('Error loading wings:', error);
+            }
+        }
+
+        async function loadAdmins() {
+            try {
+                const response = await fetch('/api/admins');
+                allAdmins = await response.json();
+                renderAdmins();
+            } catch (error) {
+                console.error('Error loading admins:', error);
+            }
+        }
+
+        function renderAdmins() {
+            const list = document.getElementById('adminList');
+            if (allAdmins.length === 0) {
+                list.innerHTML = '<div class="text-center py-4 text-gray-500 col-span-3">No admins added</div>';
+                return;
+            }
+            list.innerHTML = allAdmins.map(a => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div>
+                        <div class="font-medium text-gray-900">${a.name}</div>
+                        <div class="text-sm text-gray-500">ID: ${a.admin_id}</div>
+                    </div>
+                    <button onclick="deleteAdmin('${a._id}')" class="text-red-500 hover:text-red-700">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        async function addAdmin() {
+            const name = document.getElementById('adminName').value.trim();
+            const adminId = document.getElementById('adminId').value.trim();
+            const password = document.getElementById('adminPassword').value;
+            
+            if (!name || !adminId || !password) {
+                alert('Please fill in all admin fields');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admins', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, admin_id: adminId, password })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('adminName').value = '';
+                    document.getElementById('adminId').value = '';
+                    document.getElementById('adminPassword').value = '';
+                    loadAdmins();
+                } else {
+                    alert(result.error || 'Error adding admin');
+                }
+            } catch (error) {
+                console.error('Error adding admin:', error);
+            }
+        }
+
+        async function deleteAdmin(adminId) {
+            if (!confirm('Delete this admin?')) return;
+            
+            try {
+                await fetch(`/api/admins/${adminId}`, { method: 'DELETE' });
+                loadAdmins();
+            } catch (error) {
+                console.error('Error deleting admin:', error);
             }
         }
 

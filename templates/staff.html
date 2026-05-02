@@ -17,12 +17,17 @@
                 <span>TriageFlow</span>
             </div>
             <div class="flex items-center gap-2">
-                <a href="/" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-gauge mr-2"></i>Dashboard</a>
-                <a href="/patient-intake" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-user-plus mr-2"></i>Patient Intake</a>
+                <a href="/dashboard" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-gauge mr-2"></i>Dashboard</a>
+                
+                <a href="/my-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-user-injured mr-2"></i>My Patients</a>
                 <a href="/staff" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"><i class="fa-solid fa-users mr-2"></i>Staff</a>
                 <a href="/condition-x" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-virus mr-2"></i>Condition X</a>
+                {% if user_role == 'Admin' %}
                 <a href="/settings" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-cog mr-2"></i>Settings</a>
+                {% endif %}
+                <a href="/bed-qr" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-qrcode mr-2"></i>Bed QR</a>
                 <a href="/all-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users-list mr-2"></i>All Patients</a>
+                <a href="/logout" class="px-4 py-2 rounded-lg text-red-600 hover:bg-red-50 font-medium"><i class="fa-solid fa-sign-out mr-2"></i>Logout</a>
             </div>
         </div>
     </nav>

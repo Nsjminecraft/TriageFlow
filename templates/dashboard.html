@@ -33,12 +33,17 @@
                 <span>TriageFlow</span>
             </div>
             <div class="flex items-center gap-2">
-                <a href="/" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"><i class="fa-solid fa-gauge mr-2"></i>Dashboard</a>
-                <a href="/patient-intake" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-user-plus mr-2"></i>Patient Intake</a>
+                <a href="/dashboard" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"><i class="fa-solid fa-gauge mr-2"></i>Dashboard</a>
+                
+                <a href="/my-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-user-injured mr-2"></i>My Patients</a>
                 <a href="/staff" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users mr-2"></i>Staff</a>
                 <a href="/condition-x" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-virus mr-2"></i>Condition X</a>
+                {% if user_role == 'Admin' %}
                 <a href="/settings" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-cog mr-2"></i>Settings</a>
+                {% endif %}
+                <a href="/bed-qr" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-qrcode mr-2"></i>Bed QR</a>
                 <a href="/all-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users-list mr-2"></i>All Patients</a>
+                <a href="/logout" class="px-4 py-2 rounded-lg text-red-600 hover:bg-red-50 font-medium"><i class="fa-solid fa-sign-out mr-2"></i>Logout</a>
             </div>
         </div>
     </nav>
@@ -108,11 +113,11 @@
     <div class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50" id="assignModal">
         <div class="bg-white rounded-xl w-full max-w-md mx-4 shadow-xl">
             <div class="p-5 border-b border-gray-200 flex justify-between items-center">
-                <h3 class="text-lg font-semibold" id="modalTitle">AI Auto-Assign Patient</h3>
+                <h3 class="text-lg font-semibold" id="modalTitle">Assign Patient</h3>
                 <button class="text-gray-400 hover:text-gray-600 text-2xl" onclick="closeModal()">&times;</button>
             </div>
             <div class="p-5">
-                <div class="text-center py-4">
+                <div class="text-center py-4 mb-4">
                     <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <i class="fa-solid fa-robot text-2xl text-blue-600"></i>
                     </div>
@@ -123,12 +128,24 @@
                         <li><i class="fa-solid fa-check text-green-500 mr-2"></i>Assign up to 3 nurses with fewest patients</li>
                     </ul>
                 </div>
+                
+                <div class="border-t border-gray-200 pt-4">
+                    <p class="text-sm text-gray-500 mb-3">Or select a bed manually:</p>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Bed</label>
+                    <div class="grid grid-cols-4 gap-2 max-h-32 overflow-y-auto" id="manualBedSelection">
+                        <div class="text-center text-gray-400 text-sm">Loading...</div>
+                    </div>
+                </div>
+                
                 <div id="assignStatus" class="text-center text-sm text-gray-500 mt-4 hidden">
                     <i class="fa-solid fa-spinner fa-spin mr-2"></i>Assigning...
                 </div>
             </div>
             <div class="p-5 border-t border-gray-200 flex justify-end gap-2">
                 <button class="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 font-medium" onclick="closeModal()">Cancel</button>
+                <button class="px-4 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600 font-medium" onclick="manualAssign()">
+                    <i class="fa-solid fa-hand-pointer mr-2"></i>Manual
+                </button>
                 <button class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium" onclick="confirmAssignment()">
                     <i class="fa-solid fa-magic mr-2"></i>AI Assign
                 </button>

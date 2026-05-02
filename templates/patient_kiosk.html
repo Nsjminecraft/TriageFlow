@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TriageFlow - Patient Check-In</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gradient-to-br from-blue-500 to-blue-700 min-h-screen">
+    <div class="p-8 max-w-3xl mx-auto">
+        <div class="text-center mb-8">
+            <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <i class="fa-solid fa-heart-pulse text-4xl text-blue-600"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-white mb-2">Welcome to TriageFlow</h1>
+            <p class="text-blue-100">Please check in using the form below</p>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-xl p-8">
+            <form id="triageForm" class="space-y-6">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4"><i class="fa-solid fa-user mr-2"></i>Your Information</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                            <input type="text" id="patientName" name="name" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Enter your full name" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                            <input type="tel" id="patientPhone" name="phone" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="(555) 123-4567" inputmode="numeric" pattern="[0-9]*" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-1"><i class="fa-solid fa-stethoscope mr-2"></i>Quick Health Check</h3>
+                    <p class="text-gray-500 text-sm mb-4">Answer 3 quick questions to determine your priority</p>
+                    
+                    <div class="bg-blue-50 rounded-lg p-5 mb-4">
+                        <label class="font-semibold text-gray-900 flex items-center gap-3 mb-3">
+                            <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">1</span>
+                            What is your main symptom or injury?
+                        </label>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="chest pain" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-heart mb-1"></i>
+                                    <div class="text-sm">Chest Pain</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="difficulty breathing" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-wind mb-1"></i>
+                                    <div class="text-sm">Breathing Issues</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="fracture" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-bone mb-1"></i>
+                                    <div class="text-sm">Fracture</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="severe bleeding" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-droplet mb-1"></i>
+                                    <div class="text-sm">Severe Bleeding</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="high fever" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-thermometer mb-1"></i>
+                                    <div class="text-sm">High Fever</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="severe headache" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-head-side mb-1"></i>
+                                    <div class="text-sm">Severe Headache</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="cough" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-lungs mb-1"></i>
+                                    <div class="text-sm">Cough</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="nausea" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-stomach mb-1"></i>
+                                    <div class="text-sm">Nausea/Vomiting</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="dizziness" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-spinner mb-1"></i>
+                                    <div class="text-sm">Dizziness</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="mild pain" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-bandage mb-1"></i>
+                                    <div class="text-sm">Mild Pain</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 rounded-lg p-5 mb-4">
+                        <label class="font-semibold text-gray-900 flex items-center gap-3 mb-3">
+                            <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">2</span>
+                            How long have you had symptoms?
+                        </label>
+                        <select name="duration" id="duration" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
+                            <option value="">Select...</option>
+                            <option value="less than 1 hour">Less than 1 hour</option>
+                            <option value="1-6 hours">1-6 hours</option>
+                            <option value="6-24 hours">6-24 hours</option>
+                            <option value="1-3 days">1-3 days</option>
+                            <option value="more than 3 days">More than 3 days</option>
+                        </select>
+                    </div>
+
+                    <div class="bg-blue-50 rounded-lg p-5">
+                        <label class="font-semibold text-gray-900 flex items-center gap-3 mb-3">
+                            <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">3</span>
+                            Are you having trouble breathing?
+                        </label>
+                        <div class="flex gap-4">
+                            <label class="cursor-pointer flex-1 breathing-yes">
+                                <input type="radio" name="breathing_trouble" value="yes" class="hidden">
+                                <div class="px-6 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all font-medium" onclick="selectBreathing('yes')">
+                                    <i class="fa-solid fa-circle-xmark mr-2"></i> Yes
+                                </div>
+                            </label>
+                            <label class="cursor-pointer flex-1 breathing-no">
+                                <input type="radio" name="breathing_trouble" value="no" class="hidden" checked onclick="selectBreathing('no')">
+                                <div class="px-6 py-3 bg-green-50 border-2 border-green-500 rounded-lg text-center hover:border-blue-500 transition-all font-medium text-green-700">
+                                    <i class="fa-solid fa-circle-check mr-2"></i> No
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 rounded-lg p-5 mb-4">
+                        <label class="font-semibold text-gray-900 flex items-center gap-3 mb-3">
+                            <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">4</span>
+                            Do you have a family history of this condition?
+                        </label>
+                        <div class="flex gap-4">
+                            <label class="cursor-pointer flex-1 family-history-yes">
+                                <input type="radio" name="family_history" value="yes" class="hidden">
+                                <div class="px-6 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all font-medium" onclick="selectFamilyHistory('yes')">
+                                    <i class="fa-solid fa-circle-xmark mr-2"></i> Yes
+                                </div>
+                            </label>
+                            <label class="cursor-pointer flex-1 family-history-no">
+                                <input type="radio" name="family_history" value="no" class="hidden" checked onclick="selectFamilyHistory('no')">
+                                <div class="px-6 py-3 bg-green-50 border-2 border-green-500 rounded-lg text-center hover:border-blue-500 transition-all font-medium text-green-700">
+                                    <i class="fa-solid fa-circle-check mr-2"></i> No
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 rounded-lg p-5 mb-4">
+                        <label class="font-semibold text-gray-900 flex items-center gap-3 mb-3">
+                            <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">5</span>
+                            Do you use tobacco, illicit drugs, or alcohol?
+                        </label>
+                        <div class="flex gap-4">
+                            <label class="cursor-pointer flex-1 substance-yes">
+                                <input type="radio" name="substance_use" value="yes" class="hidden">
+                                <div class="px-6 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all font-medium" onclick="selectSubstance('yes')">
+                                    <i class="fa-solid fa-circle-xmark mr-2"></i> Yes
+                                </div>
+                            </label>
+                            <label class="cursor-pointer flex-1 substance-no">
+                                <input type="radio" name="substance_use" value="no" class="hidden" checked onclick="selectSubstance('no')">
+                                <div class="px-6 py-3 bg-green-50 border-2 border-green-500 rounded-lg text-center hover:border-blue-500 transition-all font-medium text-green-700">
+                                    <i class="fa-solid fa-circle-check mr-2"></i> No
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 rounded-lg p-5 mb-4">
+                        <label class="font-semibold text-gray-900 flex items-center gap-3 mb-3">
+                            <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">6</span>
+                            Are you sexually active?
+                        </label>
+                        <div class="flex gap-4">
+                            <label class="cursor-pointer flex-1 sexually-active-yes">
+                                <input type="radio" name="sexually_active" value="yes" class="hidden">
+                                <div class="px-6 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all font-medium" onclick="selectSexuallyActive('yes')">
+                                    <i class="fa-solid fa-circle-xmark mr-2"></i> Yes
+                                </div>
+                            </label>
+                            <label class="cursor-pointer flex-1 sexually-active-no">
+                                <input type="radio" name="sexually_active" value="no" class="hidden" checked onclick="selectSexuallyActive('no')">
+                                <div class="px-6 py-3 bg-green-50 border-2 border-green-500 rounded-lg text-center hover:border-blue-500 transition-all font-medium text-green-700">
+                                    <i class="fa-solid fa-circle-check mr-2"></i> No
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 rounded-lg p-5 mb-4">
+                        <label class="font-semibold text-gray-900 flex items-center gap-3 mb-3">
+                            <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">7</span>
+                            What medications, vitamins, or supplements do you take?
+                        </label>
+                        <textarea name="medications" id="medications" rows="2" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="List any medications you currently take..."></textarea>
+                    </div>
+
+                    <div class="bg-blue-50 rounded-lg p-5 mb-4">
+                        <button type="button" onclick="toggleOtherSymptoms()" class="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 transition-all font-medium text-left flex items-center justify-between">
+                            <span><i class="fa-solid fa-plus-circle mr-2"></i>Add Other Symptoms</span>
+                            <i class="fa-solid fa-chevron-down" id="otherSymptomsIcon"></i>
+                        </button>
+                        <div id="otherSymptomsBox" class="hidden mt-3">
+                            <textarea name="other_symptoms" id="otherSymptomsText" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Describe any other symptoms here..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center pt-6 border-t border-gray-200">
+                    <button type="submit" class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-lg shadow-lg">
+                        <i class="fa-solid fa-paper-plane mr-2"></i>Check In
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <div class="text-center mt-6 text-blue-100 text-sm">
+            <p>Staff will call your name when ready</p>
+        </div>
+    </div>
+
+    <div class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50" id="resultModal">
+        <div class="bg-white rounded-2xl p-8 text-center max-w-md mx-4 shadow-xl">
+            <div id="resultIcon" class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <h2 class="text-2xl font-bold mb-2" id="resultTitle">Check-In Complete!</h2>
+            <div class="mb-4">
+                <span class="px-6 py-2 rounded-full text-lg font-bold" id="resultBadge">Simple</span>
+            </div>
+            <div id="resultContent" class="text-left mb-6"></div>
+            <button class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium" onclick="closeResult()">Done</button>
+        </div>
+    </div>
+
+    <script>
+        function selectBreathing(value) {
+            document.querySelectorAll('input[name="breathing_trouble"]').forEach(r => {
+                r.checked = (r.value === value);
+                const label = r.closest('label');
+                const box = label.querySelector('div');
+                box.classList.remove('bg-red-50', 'bg-green-50', 'border-red-500', 'border-green-500', 'text-red-600', 'text-green-700', 'border-gray-200');
+                box.classList.add('bg-white', 'border-gray-200');
+                if (value === 'yes' && r.value === 'yes') {
+                    box.classList.remove('bg-white', 'border-gray-200');
+                    box.classList.add('bg-red-50', 'border-red-500', 'text-red-600');
+                } else if (value === 'no' && r.value === 'no') {
+                    box.classList.remove('bg-white', 'border-gray-200');
+                    box.classList.add('bg-green-50', 'border-green-500', 'text-green-700');
+                }
+            });
+        }
+
+        function selectFamilyHistory(value) {
+            document.querySelectorAll('input[name="family_history"]').forEach(r => {
+                r.checked = (r.value === value);
+                const label = r.closest('label');
+                const box = label.querySelector('div');
+                box.classList.remove('bg-red-50', 'bg-green-50', 'border-red-500', 'border-green-500', 'text-red-600', 'text-green-700', 'border-gray-200');
+                box.classList.add('bg-white', 'border-gray-200');
+                if (value === 'yes' && r.value === 'yes') {
+                    box.classList.remove('bg-white', 'border-gray-200');
+                    box.classList.add('bg-red-50', 'border-red-500', 'text-red-600');
+                } else if (value === 'no' && r.value === 'no') {
+                    box.classList.remove('bg-white', 'border-gray-200');
+                    box.classList.add('bg-green-50', 'border-green-500', 'text-green-700');
+                }
+            });
+        }
+
+        function selectSubstance(value) {
+            document.querySelectorAll('input[name="substance_use"]').forEach(r => {
+                r.checked = (r.value === value);
+                const label = r.closest('label');
+                const box = label.querySelector('div');
+                box.classList.remove('bg-red-50', 'bg-green-50', 'border-red-500', 'border-green-500', 'text-red-600', 'text-green-700', 'border-gray-200');
+                box.classList.add('bg-white', 'border-gray-200');
+                if (value === 'yes' && r.value === 'yes') {
+                    box.classList.remove('bg-white', 'border-gray-200');
+                    box.classList.add('bg-red-50', 'border-red-500', 'text-red-600');
+                } else if (value === 'no' && r.value === 'no') {
+                    box.classList.remove('bg-white', 'border-gray-200');
+                    box.classList.add('bg-green-50', 'border-green-500', 'text-green-700');
+                }
+            });
+        }
+
+        function selectSexuallyActive(value) {
+            document.querySelectorAll('input[name="sexually_active"]').forEach(r => {
+                r.checked = (r.value === value);
+                const label = r.closest('label');
+                const box = label.querySelector('div');
+                box.classList.remove('bg-red-50', 'bg-green-50', 'border-red-500', 'border-green-500', 'text-red-600', 'text-green-700', 'border-gray-200');
+                box.classList.add('bg-white', 'border-gray-200');
+                if (value === 'yes' && r.value === 'yes') {
+                    box.classList.remove('bg-white', 'border-gray-200');
+                    box.classList.add('bg-red-50', 'border-red-500', 'text-red-600');
+                } else if (value === 'no' && r.value === 'no') {
+                    box.classList.remove('bg-white', 'border-gray-200');
+                    box.classList.add('bg-green-50', 'border-green-500', 'text-green-700');
+                }
+            });
+        }
+
+        function toggleOtherSymptoms() {
+            const box = document.getElementById('otherSymptomsBox');
+            const icon = document.getElementById('otherSymptomsIcon');
+            if (box.classList.contains('hidden')) {
+                box.classList.remove('hidden');
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            } else {
+                box.classList.add('hidden');
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        }
+
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const box = this.nextElementSibling;
+                if (this.checked) {
+                    box.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-600');
+                } else {
+                    box.classList.remove('bg-blue-50', 'border-blue-500', 'text-blue-600');
+                }
+            });
+        });
+
+        document.getElementById('triageForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const symptoms = formData.getAll('symptoms');
+            const otherSymptoms = formData.get('other_symptoms');
+            
+            if (otherSymptoms && otherSymptoms.trim()) {
+                symptoms.push(otherSymptoms.trim());
+            }
+            
+            if (symptoms.length === 0) {
+                alert('Please select at least one symptom');
+                return;
+            }
+            
+            const data = {
+                name: formData.get('name'),
+                phone: formData.get('phone'),
+                symptoms: symptoms,
+                duration: formData.get('duration'),
+                breathing_trouble: formData.get('breathing_trouble') || 'no',
+                family_history: formData.get('family_history') || 'no',
+                substance_use: formData.get('substance_use') || 'no',
+                sexually_active: formData.get('sexually_active') || 'no',
+                medications: formData.get('medications') || ''
+            };
+            try {
+                const response = await fetch('/api/submit-triage', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showResult(result.category);
+                    e.target.reset();
+                }
+            } catch (error) {
+                console.error('Error submitting:', error);
+                alert('Error submitting. Please try again.');
+            }
+        });
+
+        function showResult(category) {
+            const colors = {
+                simple: 'bg-green-100 text-green-700',
+                attention: 'bg-yellow-100 text-yellow-700',
+                emergency: 'bg-orange-100 text-orange-700',
+                critical: 'bg-red-100 text-red-700'
+            };
+            const labels = {
+                simple: 'Simple - Low Priority',
+                attention: 'Attention - Wait Time',
+                emergency: 'Emergency - Priority',
+                critical: 'Critical - Immediate'
+            };
+            const icons = {
+                simple: 'fa-heart-pulse text-green-600 bg-green-100',
+                attention: 'fa-clinic-medical text-yellow-600 bg-yellow-100',
+                emergency: 'fa-ambulance text-orange-600 bg-orange-100',
+                critical: 'fa-procedures text-red-600 bg-red-100'
+            };
+            
+            const badge = document.getElementById('resultBadge');
+            badge.className = `px-6 py-2 rounded-full text-lg font-bold ${colors[category]}`;
+            badge.textContent = labels[category];
+            
+            document.getElementById('resultIcon').className = `w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl ${icons[category]}`;
+            
+            let content = '';
+            if (category === 'critical' || category === 'emergency') {
+                content = `
+                    <p class="text-gray-600 mb-4">Based on your symptoms, you may need immediate medical attention.</p>
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                        <p class="font-semibold text-red-800 mb-3"><i class="fa-solid fa-ambulance mr-2"></i>Do you want us to call an ambulance for you?</p>
+                        <div class="flex gap-3">
+                            <button onclick="callAmbulance()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium">
+                                <i class="fa-solid fa-phone mr-2"></i>Yes, call ambulance
+                            </button>
+                            <button onclick="proceedWithoutAmbulance()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium">
+                                No, I'll come myself
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-gray-500 text-sm mt-4">For further inquiries, call: <strong>1-800-HELP-NOW</strong></p>
+                `;
+            } else if (category === 'attention') {
+                content = `
+                    <p class="text-gray-600 mb-4">Please proceed to the nearest clinic for attention.</p>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                        <p class="font-semibold text-yellow-800"><i class="fa-solid fa-map-marker-alt mr-2"></i>Nearest Clinic Directions</p>
+                        <p class="text-sm text-yellow-700">Head to the nearest walk-in clinic. Expected wait: 1-2 hours.</p>
+                    </div>
+                    <p class="text-gray-500 text-sm">For further inquiries, call: <strong>1-800-HELP-NOW</strong></p>
+                `;
+            } else {
+                content = `
+                    <p class="text-gray-600 mb-4">Based on your symptoms, here are self-care instructions:</p>
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                        <p class="font-semibold text-green-800 mb-2"><i class="fa-solid fa-home mr-2"></i>Self-Care Instructions</p>
+                        <ul class="text-sm text-green-700 space-y-1">
+                            <li>• Rest and stay hydrated</li>
+                            <li>• Take over-the-counter pain relievers if needed</li>
+                            <li>• Monitor your symptoms</li>
+                            <li>• Return if symptoms worsen</li>
+                        </ul>
+                    </div>
+                    <p class="text-gray-500 text-sm">No need to wait. Take care of yourself at home.</p>
+                    <p class="text-gray-500 text-sm mt-4">For further inquiries, call: <strong>1-800-HELP-NOW</strong></p>
+                `;
+            }
+            
+            document.getElementById('resultContent').innerHTML = content;
+            document.getElementById('resultModal').classList.remove('hidden');
+            document.getElementById('resultModal').classList.add('flex');
+        }
+
+        function closeResult() {
+            document.getElementById('resultModal').classList.add('hidden');
+            document.getElementById('resultModal').classList.remove('flex');
+        }
+
+        function callAmbulance() {
+            const content = `
+                <div class="text-center">
+                    <div class="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-4xl">
+                        <i class="fa-solid fa-ambulance"></i>
+                    </div>
+                    <p class="text-xl font-bold text-red-600 mb-2">Ambulance Dispatched!</p>
+                    <p class="text-gray-600 mb-4">An ambulance is on its way to your location.</p>
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                        <p class="font-semibold text-red-800"><i class="fa-solid fa-phone mr-2"></i>Emergency services notified</p>
+                        <p class="text-sm text-red-600">Please stay calm and wait for the ambulance.</p>
+                    </div>
+                    <p class="text-gray-500 text-sm">For further inquiries, call: <strong>1-800-HELP-NOW</strong></p>
+                </div>
+            `;
+            document.getElementById('resultContent').innerHTML = content;
+        }
+
+        function proceedWithoutAmbulance() {
+            const content = `
+                <div class="text-center">
+                    <div class="w-16 h-16 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center mx-auto mb-4 text-4xl">
+                        <i class="fa-solid fa-running"></i>
+                    </div>
+                    <p class="text-xl font-bold text-orange-600 mb-2">Proceed to Hospital</p>
+                    <p class="text-gray-600 mb-4">Please come to the hospital immediately. Go to the emergency entrance.</p>
+                    <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+                        <p class="font-semibold text-orange-800"><i class="fa-solid fa-door-open mr-2"></i>Emergency Entrance</p>
+                        <p class="text-sm text-orange-700">Head to the emergency department. Staff will assist you upon arrival.</p>
+                    </div>
+                    <p class="text-gray-500 text-sm">For further inquiries, call: <strong>1-800-HELP-NOW</strong></p>
+                </div>
+            `;
+            document.getElementById('resultContent').innerHTML = content;
+        }
+    </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from flask_cors import CORS
 from pymongo import MongoClient
 from bson import ObjectId
@@ -6,9 +6,12 @@ from datetime import datetime, timedelta
 import json
 import random
 from config import Config
+import os
+from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
-CORS(app)
+app.secret_key = os.urandom(24)
+CORS(app, supports_credentials=True)
 
 client = MongoClient(Config.MONGO_URI)
 db = client[Config.DATABASE_NAME]
@@ -24,6 +27,14 @@ def init_database():
         default_wings = ['Emergency', 'ICU', 'General', 'Observation', 'Pediatrics', 'Surgery']
         for wing_name in default_wings:
             wings_collection.insert_one({'name': wing_name})
+    
+    admins_collection = db['admins']
+    if admins_collection.count_documents({}) == 0:
+        admins_collection.insert_one({
+            'admin_id': 'ADMIN001',
+            'name': 'Hospital Admin',
+            'password': 'admin123'
+        })
     
     if beds_collection.count_documents({}) == 0:
         wings = ['Emergency', 'ICU', 'General', 'Observation']
@@ -44,11 +55,22 @@ def init_database():
     
     if staff_collection.count_documents({}) == 0:
         roles = ['Doctor', 'Nurse']
-        for i in range(1, 11):
+        for i in range(1, 6):
+            role = 'Doctor'
             staff_collection.insert_one({
-                'staff_id': f'STF{i:03d}',
-                'name': f'Staff Member {i}',
-                'role': random.choice(roles),
+                'staff_id': f'DTS{i:03d}',
+                'name': f'Dr. Doctor {i}',
+                'role': role,
+                'status': random.choice(['available', 'busy', 'break', 'off-duty']),
+                'current_patient': None,
+                'shift': random.choice(['morning', 'evening', 'night'])
+            })
+        for i in range(1, 6):
+            role = 'Nurse'
+            staff_collection.insert_one({
+                'staff_id': f'NRS{i:03d}',
+                'name': f'Nurse {i}',
+                'role': role,
                 'status': random.choice(['available', 'busy', 'break', 'off-duty']),
                 'current_patient': None,
                 'shift': random.choice(['morning', 'evening', 'night'])
@@ -60,29 +82,213 @@ triage_questions = [
     'Are you having any trouble breathing?'
 ]
 
+def require_login():
+    if not session.get('logged_in'):
+        return False
+    return True
+
+def require_admin():
+    return session.get('user_role') == 'Admin'
+
 @app.route('/')
 def index():
-    return render_template('dashboard.html')
+    if require_login():
+        return redirect('/dashboard')
+    return redirect('/login')
+
+@app.route('/login')
+def login_page():
+    if session.get('logged_in'):
+        return redirect('/dashboard')
+    return render_template('login.html')
+
+@app.route('/dashboard')
+def dashboard():
+    if not require_login():
+        return redirect('/login')
+    return render_template('dashboard.html', user_role=session.get('user_role'))
 
 @app.route('/patient-intake')
 def patient_intake():
-    return render_template('patient_intake.html')
+    return render_template('patient_intake.html', user_role=session.get('user_role'))
+
+@app.route('/patient-kiosk')
+def patient_kiosk():
+    return render_template('patient_kiosk.html')
+
+@app.route('/my-patients')
+def my_patients_page():
+    if not require_login():
+        return redirect('/login')
+    user_role = session.get('user_role')
+    if user_role not in ['Doctor', 'Nurse']:
+        return redirect('/dashboard')
+    return render_template('my_patients.html', user_role=user_role)
+
+@app.route('/api/my-patients')
+def get_my_patients():
+    if not require_login():
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    user_id = session.get('user_id')
+    user_role = session.get('user_role')
+    
+    if user_role == 'Doctor':
+        query = {'assigned_doctors': user_id, 'status': {'$ne': 'discharged'}}
+    elif user_role == 'Nurse':
+        query = {'assigned_nurses': user_id, 'status': {'$ne': 'discharged'}}
+    else:
+        return jsonify([])
+    
+    patients = list(patients_collection.find(query).sort('check_in_time', -1))
+    for p in patients:
+        p['_id'] = str(p['_id'])
+        p['check_in_time'] = p['check_in_time'].isoformat() if p.get('check_in_time') else None
+        p['discharge_time'] = p['discharge_time'].isoformat() if p.get('discharge_time') else None
+    
+    return jsonify(patients)
 
 @app.route('/staff')
 def staff_page():
-    return render_template('staff.html')
+    if not require_login():
+        return redirect('/login')
+    return render_template('staff.html', user_role=session.get('user_role'))
 
 @app.route('/condition-x')
 def condition_x():
-    return render_template('condition_x.html')
+    if not require_login():
+        return redirect('/login')
+    return render_template('condition_x.html', user_role=session.get('user_role'))
 
 @app.route('/settings')
 def settings_page():
-    return render_template('settings.html')
+    if not require_login():
+        return redirect('/login')
+    if not require_admin():
+        return redirect('/dashboard')
+    return render_template('settings.html', user_role=session.get('user_role'))
 
 @app.route('/all-patients')
 def all_patients_page():
-    return render_template('all_patients.html')
+    if not require_login():
+        return redirect('/login')
+    return render_template('all_patients.html', user_role=session.get('user_role'))
+
+@app.route('/bed-qr')
+def bed_qr_page():
+    if not require_login():
+        return redirect('/login')
+    return render_template('bed_qr.html', user_role=session.get('user_role'))
+
+@app.route('/bed-update/<bed_id>')
+def bed_update(bed_id):
+    bed = beds_collection.find_one({'_id': ObjectId(bed_id)})
+    if not bed:
+        return render_template('bed_qr.html', error='Bed not found', user_role=session.get('user_role'))
+    
+    if bed.get('status') == 'cleaning':
+        beds_collection.update_one(
+            {'_id': ObjectId(bed_id)},
+            {'$set': {'status': 'available', 'last_updated': datetime.now()}}
+        )
+        return render_template('bed_qr.html', success=f'Bed {bed["bed_number"]} marked as available!', bed=bed, user_role=session.get('user_role'))
+    elif bed.get('status') == 'available':
+        return render_template('bed_qr.html', info=f'Bed {bed["bed_number"]} is already available', bed=bed, user_role=session.get('user_role'))
+    else:
+        return render_template('bed_qr.html', error=f'Bed {bed["bed_number"]} is currently occupied', bed=bed, user_role=session.get('user_role'))
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    login_type = data.get('type')
+    
+    if login_type == 'staff':
+        staff_id = data.get('staff_id', '').strip()
+        staff = staff_collection.find_one({'staff_id': staff_id})
+        if staff:
+            session['logged_in'] = True
+            session['user_id'] = str(staff['_id'])
+            session['user_name'] = staff['name']
+            session['user_role'] = staff['role']
+            session['login_type'] = 'staff'
+            return jsonify({'success': True})
+        return jsonify({'success': False, 'error': 'Invalid staff ID'})
+    
+    elif login_type == 'admin':
+        admin_id = data.get('admin_id', '').strip()
+        password = data.get('password', '')
+        
+        admin = db['admins'].find_one({'admin_id': admin_id, 'password': password})
+        if admin:
+            session['logged_in'] = True
+            session['user_id'] = str(admin['_id'])
+            session['user_name'] = admin['name']
+            session['user_role'] = 'Admin'
+            session['login_type'] = 'admin'
+            return jsonify({'success': True})
+        return jsonify({'success': False, 'error': 'Invalid admin credentials'})
+    
+    return jsonify({'success': False, 'error': 'Invalid login type'})
+
+@app.route('/api/logged-in-user')
+def get_logged_in_user():
+    if require_login():
+        return jsonify({
+            'logged_in': True,
+            'name': session.get('user_name'),
+            'role': session.get('user_role'),
+            'login_type': session.get('login_type')
+        })
+    return jsonify({'logged_in': False})
+
+@app.route('/api/admins')
+def get_admins():
+    if not require_login():
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    admins = list(db['admins'].find())
+    for a in admins:
+        a['_id'] = str(a['_id'])
+        a.pop('password', None)
+    return jsonify(admins)
+
+@app.route('/api/admins', methods=['POST'])
+def create_admin():
+    if not require_login():
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json
+    name = data.get('name', '').strip()
+    admin_id = data.get('admin_id', '').strip()
+    password = data.get('password', '')
+    
+    if not name or not admin_id or not password:
+        return jsonify({'success': False, 'error': 'All fields required'})
+    
+    existing = db['admins'].find_one({'admin_id': admin_id})
+    if existing:
+        return jsonify({'success': False, 'error': 'Admin ID already exists'})
+    
+    result = db['admins'].insert_one({
+        'name': name,
+        'admin_id': admin_id,
+        'password': password
+    })
+    
+    return jsonify({'success': True, '_id': str(result.inserted_id)})
+
+@app.route('/api/admins/<admin_id>', methods=['DELETE'])
+def delete_admin(admin_id):
+    if not require_login():
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    db['admins'].delete_one({'_id': ObjectId(admin_id)})
+    return jsonify({'success': True})
 
 @app.route('/api/all-patients')
 def get_all_patients():
@@ -161,6 +367,10 @@ def submit_triage():
     symptoms = data.get('symptoms', [])
     duration = data.get('duration', '')
     breathing_trouble = data.get('breathing_trouble', 'no')
+    family_history = data.get('family_history', 'no')
+    substance_use = data.get('substance_use', 'no')
+    sexually_active = data.get('sexually_active', 'no')
+    medications = data.get('medications', '')
     
     triage_category = categorize_patient(symptoms, breathing_trouble)
     
@@ -170,6 +380,10 @@ def submit_triage():
         'symptoms': symptoms,
         'duration': duration,
         'breathing_trouble': breathing_trouble == 'yes',
+        'family_history': family_history == 'yes',
+        'substance_use': substance_use == 'yes',
+        'sexually_active': sexually_active == 'yes',
+        'medications': medications,
         'triage_category': triage_category,
         'status': 'waiting',
         'check_in_time': datetime.now(),
@@ -215,18 +429,19 @@ def auto_assign(patient_id):
     
     for doc in available_doctors:
         doc['current_count'] = patients_collection.count_documents({
-            'assigned_doctors': doc['_id']
+            'assigned_doctors': doc['_id'],
+            'status': {'$ne': 'discharged'}
         })
     
     available_doctors = [d for d in available_doctors if d['current_count'] < max_patients_per_staff]
     available_doctors.sort(key=lambda x: x['current_count'])
     
     assigned_doctor = None
-    if available_doctors and len(patient.get('assigned_doctors', [])) < 1:
+    if available_doctors:
         assigned_doctor = available_doctors[0]
         patients_collection.update_one(
             {'_id': ObjectId(patient_id)},
-            {'$push': {'assigned_doctors': str(assigned_doctor['_id'])}}
+            {'$set': {'assigned_doctors': [str(assigned_doctor['_id'])]}}
         )
         staff_collection.update_one(
             {'_id': assigned_doctor['_id']},
@@ -240,7 +455,8 @@ def auto_assign(patient_id):
     
     for nurse in available_nurses:
         nurse['current_count'] = patients_collection.count_documents({
-            'assigned_nurses': nurse['_id']
+            'assigned_nurses': nurse['_id'],
+            'status': {'$ne': 'discharged'}
         })
     
     available_nurses = [n for n in available_nurses if n['current_count'] < max_patients_per_staff]
@@ -263,10 +479,47 @@ def auto_assign(patient_id):
                 {'$set': {'status': 'busy'}}
             )
     
+    triage_category = patient.get('triage_category', 'simple')
+    wing_priority = {
+        'critical': ['ICU', 'Emergency'],
+        'emergency': ['Emergency', 'ICU', 'General'],
+        'attention': ['General', 'Observation'],
+        'simple': ['Observation', 'General']
+    }
+    
+    preferred_wings = wing_priority.get(triage_category, ['General'])
+    assigned_bed = None
+    
+    for wing in preferred_wings:
+        available_bed = beds_collection.find_one({
+            'wing': wing,
+            'status': 'available'
+        })
+        if available_bed:
+            assigned_bed = available_bed
+            break
+    
+    if not assigned_bed:
+        assigned_bed = beds_collection.find_one({'status': 'available'})
+    
+    bed_assigned = None
+    if assigned_bed:
+        bed_number = assigned_bed['bed_number']
+        beds_collection.update_one(
+            {'bed_number': bed_number},
+            {'$set': {'status': 'occupied', 'patient_id': patient_id, 'last_updated': datetime.now()}}
+        )
+        patients_collection.update_one(
+            {'_id': ObjectId(patient_id)},
+            {'$set': {'assigned_bed': bed_number, 'status': 'admitted'}}
+        )
+        bed_assigned = bed_number
+    
     return jsonify({
         'success': True,
         'assigned_doctor': str(assigned_doctor['_id']) if assigned_doctor else None,
-        'assigned_nurses': assigned_nurses
+        'assigned_nurses': assigned_nurses,
+        'assigned_bed': bed_assigned
     })
 
 def categorize_patient(symptoms, breathing_trouble):
@@ -308,6 +561,46 @@ def get_beds():
     for b in beds:
         b['_id'] = str(b['_id'])
         b['last_updated'] = b['last_updated'].isoformat() if b.get('last_updated') else None
+        
+        patient = None
+        if b.get('patient_id'):
+            try:
+                patient = patients_collection.find_one({'_id': ObjectId(b['patient_id'])})
+            except:
+                patient = patients_collection.find_one({'_id': b['patient_id']})
+        
+        if not patient and b.get('bed_number'):
+            patient = patients_collection.find_one({'assigned_bed': b['bed_number'], 'status': 'admitted'})
+            if not patient:
+                patient = patients_collection.find_one({'assigned_bed': str(b['_id']), 'status': 'admitted'})
+        
+        if patient:
+            b['patient_info'] = {
+                'name': patient.get('name', 'Unknown'),
+                'phone': patient.get('phone', ''),
+                'symptoms': patient.get('symptoms', []),
+                'triage_category': patient.get('triage_category', 'unknown'),
+                'status': patient.get('status', 'unknown'),
+                'check_in_time': patient.get('check_in_time').isoformat() if patient.get('check_in_time') else None
+            }
+            doctors = []
+            nurses = []
+            for doc_id in patient.get('assigned_doctors', []):
+                try:
+                    doc = staff_collection.find_one({'_id': ObjectId(doc_id)})
+                except:
+                    doc = staff_collection.find_one({'_id': doc_id})
+                if doc:
+                    doctors.append(doc.get('name', 'Unknown'))
+            for nurse_id in patient.get('assigned_nurses', []):
+                try:
+                    nurse = staff_collection.find_one({'_id': ObjectId(nurse_id)})
+                except:
+                    nurse = staff_collection.find_one({'_id': nurse_id})
+                if nurse:
+                    nurses.append(nurse.get('name', 'Unknown'))
+            b['patient_info']['doctors'] = doctors
+            b['patient_info']['nurses'] = nurses
     return jsonify(beds)
 
 @app.route('/api/beds/<bed_id>', methods=['PUT'])
@@ -370,8 +663,12 @@ def create_staff():
     if role not in ['Doctor', 'Nurse']:
         return jsonify({'success': False, 'error': 'Invalid role'})
     
-    count = staff_collection.count_documents({})
-    staff_id = f'STF{count + 1:03d}'
+    if role == 'Doctor':
+        doctor_count = staff_collection.count_documents({'role': 'Doctor'})
+        staff_id = f'DTS{doctor_count + 1:03d}'
+    else:
+        nurse_count = staff_collection.count_documents({'role': 'Nurse'})
+        staff_id = f'NRS{nurse_count + 1:03d}'
     
     result = staff_collection.insert_one({
         'staff_id': staff_id,

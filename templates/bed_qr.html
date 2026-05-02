@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TriageFlow - Bed QR Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white border-b border-gray-200 px-6 py-3 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3 text-blue-600 text-xl font-bold">
+                <i class="fa-solid fa-heart-pulse text-2xl"></i>
+                <span>TriageFlow</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/dashboard" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-gauge mr-2"></i>Dashboard</a>
+                
+                <a href="/my-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-user-injured mr-2"></i>My Patients</a>
+                <a href="/staff" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users mr-2"></i>Staff</a>
+                <a href="/condition-x" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-virus mr-2"></i>Condition X</a>
+                {% if user_role == 'Admin' %}
+                <a href="/settings" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-cog mr-2"></i>Settings</a>
+                {% endif %}
+                <a href="/bed-qr" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"><i class="fa-solid fa-qrcode mr-2"></i>Bed QR</a>
+                <a href="/all-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users-list mr-2"></i>All Patients</a>
+                <a href="/logout" class="px-4 py-2 rounded-lg text-red-600 hover:bg-red-50 font-medium"><i class="fa-solid fa-sign-out mr-2"></i>Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="p-8 max-w-4xl mx-auto">
+        {% if success %}
+        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mb-6 flex items-center">
+            <i class="fa-solid fa-check-circle text-2xl mr-3"></i>
+            <div>
+                <p class="font-bold">Success!</p>
+                <p>{{ success }}</p>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if error %}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center">
+            <i class="fa-solid fa-exclamation-circle text-2xl mr-3"></i>
+            <div>
+                <p class="font-bold">Error</p>
+                <p>{{ error }}</p>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if info %}
+        <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-lg mb-6 flex items-center">
+            <i class="fa-solid fa-info-circle text-2xl mr-3"></i>
+            <div>
+                <p class="font-bold">Info</p>
+                <p>{{ info }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if bed %}
+        <div class="text-center mb-8">
+            <div class="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 {% if bed.status == 'available' %}bg-green-100 text-green-600{% elif bed.status == 'occupied' %}bg-red-100 text-red-600{% else %}bg-amber-100 text-amber-600{% endif %}">
+                <i class="fa-solid fa-bed text-4xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-900">Bed {{ bed.bed_number }}</h1>
+            <p class="text-gray-500">{{ bed.wing }}</p>
+            <span class="inline-block px-4 py-2 rounded-full text-sm font-medium mt-2 {% if bed.status == 'available' %}bg-green-100 text-green-700{% elif bed.status == 'occupied' %}bg-red-100 text-red-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                {{ bed.status }}
+            </span>
+            
+            <div class="mt-6">
+                <a href="/bed-qr" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                    <i class="fa-solid fa-list mr-2"></i>View All Beds
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fa-solid fa-qrcode text-2xl text-blue-600"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-900">Bed QR Code Management</h1>
+            <p class="text-gray-500">Scan or tap a bed's QR code to mark it as cleaned/available</p>
+        </div>
+
+        <div id="bedList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="text-center py-8 text-gray-500">Loading beds...</div>
+        </div>
+
+        <div class="mt-8 p-4 bg-blue-50 rounded-lg">
+            <h3 class="font-semibold text-blue-900 mb-2"><i class="fa-solid fa-info-circle mr-2"></i>How to use:</h3>
+            <ol class="text-sm text-blue-800 space-y-1">
+                <li>1. Staff cleans a bed after patient discharge</li>
+                <li>2. Scan or tap the bed's unique QR code</li>
+                <li>3. The bed status changes from "Cleaning" to "Available"</li>
+            </ol>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if not bed %}
+    <script>
+        const baseUrl = window.location.origin;
+
+        async function loadBeds() {
+            try {
+                const response = await fetch('/api/beds');
+                const beds = await response.json();
+                renderBeds(beds);
+            } catch (error) {
+                console.error('Error loading beds:', error);
+                document.getElementById('bedList').innerHTML = '<div class="text-center py-8 text-red-500">Error loading beds</div>';
+            }
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                available: 'bg-green-100 text-green-700 border-green-300',
+                occupied: 'bg-red-100 text-red-700 border-red-300',
+                cleaning: 'bg-amber-100 text-amber-700 border-amber-300'
+            };
+            return colors[status] || 'bg-gray-100 text-gray-700';
+        }
+
+        function renderBeds(beds) {
+            const container = document.getElementById('bedList');
+            if (beds.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No beds found</div>';
+                return;
+            }
+
+            container.innerHTML = beds.map(bed => `
+                <div class="bg-white rounded-xl p-6 shadow-sm border-2 ${getStatusColor(bed.status)}">
+                    <div class="text-center mb-4">
+                        <div class="text-3xl font-bold mb-1">Bed ${bed.bed_number}</div>
+                        <div class="text-sm">${bed.wing || 'General'}</div>
+                        <span class="inline-block px-3 py-1 rounded-full text-xs font-medium mt-2 ${getStatusColor(bed.status)}">
+                            ${bed.status.charAt(0).toUpperCase() + bed.status.slice(1)}
+                        </span>
+                    </div>
+                    
+                    <div class="flex justify-center mb-4">
+                        <a href="/bed-update/${bed._id}" class="block p-2 bg-white rounded-lg border hover:border-blue-500">
+                            <div id="qr-${bed._id}"></div>
+                        </a>
+                    </div>
+                    
+                    ${bed.status === 'cleaning' ? `
+                    <a href="/bed-update/${bed._id}" class="block w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-center">
+                        <i class="fa-solid fa-check mr-2"></i>Mark Available
+                    </a>
+                    ` : `
+                    <div class="text-center text-sm text-gray-400">
+                        ${bed.status === 'available' ? 'Ready for patient' : 'Occupied'}
+                    </div>
+                    `}
+                </div>
+            `).join('');
+
+            beds.forEach(bed => {
+                const qrUrl = `${baseUrl}/bed-update/${bed._id}`;
+                new QRCode(document.getElementById(`qr-${bed._id}`), {
+                    text: qrUrl,
+                    width: 100,
+                    height: 100,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff"
+                });
+            });
+        }
+
+        loadBeds();
+    </script>
+    {% endif %}
+</body>
+</html>

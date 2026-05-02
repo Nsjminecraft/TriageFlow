@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TriageFlow - All Patients</title>
+    <title>TriageFlow - My Patients</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -19,14 +19,14 @@
             <div class="flex items-center gap-2">
                 <a href="/dashboard" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-gauge mr-2"></i>Dashboard</a>
                 
-                <a href="/my-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-user-injured mr-2"></i>My Patients</a>
+                <a href="/my-patients" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"><i class="fa-solid fa-user-injured mr-2"></i>My Patients</a>
                 <a href="/staff" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users mr-2"></i>Staff</a>
                 <a href="/condition-x" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-virus mr-2"></i>Condition X</a>
                 {% if user_role == 'Admin' %}
                 <a href="/settings" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-cog mr-2"></i>Settings</a>
                 {% endif %}
                 <a href="/bed-qr" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-qrcode mr-2"></i>Bed QR</a>
-                <a href="/all-patients" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"><i class="fa-solid fa-users-list mr-2"></i>All Patients</a>
+                <a href="/all-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users-list mr-2"></i>All Patients</a>
                 <a href="/logout" class="px-4 py-2 rounded-lg text-red-600 hover:bg-red-50 font-medium"><i class="fa-solid fa-sign-out mr-2"></i>Logout</a>
             </div>
         </div>
@@ -35,14 +35,13 @@
     <div class="p-8 max-w-6xl mx-auto">
         <div class="flex justify-between items-center mb-6">
             <div>
-                <h1 class="text-2xl font-bold text-gray-900"><i class="fa-solid fa-users-list mr-2"></i>All Patients Today</h1>
-                <p class="text-gray-500" id="dateDisplay"></p>
+                <h1 class="text-2xl font-bold text-gray-900"><i class="fa-solid fa-user-injured mr-2"></i>My Patients</h1>
+                <p class="text-gray-500" id="staffInfo">Loading...</p>
             </div>
             <div class="flex gap-2">
                 <button onclick="filterPatients('all')" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium filter-btn" data-filter="all">All</button>
                 <button onclick="filterPatients('waiting')" class="px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 font-medium filter-btn" data-filter="waiting">Waiting</button>
                 <button onclick="filterPatients('admitted')" class="px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 font-medium filter-btn" data-filter="admitted">Admitted</button>
-                <button onclick="filterPatients('discharged')" class="px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 font-medium filter-btn" data-filter="discharged">Discharged</button>
             </div>
         </div>
 
@@ -52,25 +51,40 @@
     </div>
 
     <script>
-        let allPatients = [];
+        let myPatients = [];
         let staffData = [];
         let currentFilter = 'all';
+        let currentStaffId = null;
 
-        document.getElementById('dateDisplay').textContent = new Date().toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-        });
-
-        async function loadPatients() {
+        async function init() {
             try {
-                const [patientsRes, staffRes] = await Promise.all([
-                    fetch('/api/all-patients'),
-                    fetch('/api/staff')
-                ]);
-                allPatients = await patientsRes.json();
+                const userRes = await fetch('/api/logged-in-user');
+                const user = await userRes.json();
+                
+                if (!user.logged_in || (user.role !== 'Doctor' && user.role !== 'Nurse')) {
+                    window.location.href = '/dashboard';
+                    return;
+                }
+                
+                document.getElementById('staffInfo').textContent = `${user.name} - ${user.role}`;
+                
+                const staffRes = await fetch('/api/staff');
                 staffData = await staffRes.json();
+                
+                const currentStaff = staffData.find(s => s.name === user.name);
+                if (currentStaff) {
+                    currentStaffId = currentStaff._id;
+                    loadMyPatients();
+                }
+            } catch (error) {
+                console.error('Error initializing:', error);
+            }
+        }
+
+        async function loadMyPatients() {
+            try {
+                const response = await fetch('/api/my-patients');
+                myPatients = await response.json();
                 renderPatients();
             } catch (error) {
                 console.error('Error loading patients:', error);
@@ -87,12 +101,6 @@
             if (!isoString) return 'N/A';
             const date = new Date(isoString);
             return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        }
-
-        function formatDate(isoString) {
-            if (!isoString) return 'N/A';
-            const date = new Date(isoString);
-            return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
 
         function getCategoryColor(category) {
@@ -118,8 +126,7 @@
         function getStatusBadge(status) {
             const badges = {
                 waiting: 'bg-amber-100 text-amber-700',
-                admitted: 'bg-blue-100 text-blue-700',
-                discharged: 'bg-gray-100 text-gray-600'
+                admitted: 'bg-blue-100 text-blue-700'
             };
             return badges[status] || 'bg-gray-100 text-gray-700';
         }
@@ -138,11 +145,11 @@
         function renderPatients() {
             const grid = document.getElementById('patientsGrid');
             const filtered = currentFilter === 'all' 
-                ? allPatients 
-                : allPatients.filter(p => p.status === currentFilter);
+                ? myPatients 
+                : myPatients.filter(p => p.status === currentFilter);
             
             if (filtered.length === 0) {
-                grid.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No patients found</div>';
+                grid.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No patients assigned to you</div>';
                 return;
             }
             
@@ -155,7 +162,7 @@
                             </div>
                             <div>
                                 <h4 class="font-semibold text-gray-900">${p.name || 'Anonymous'}</h4>
-                                <p class="text-gray-400 text-xs">ID: ${p._id.substring(0, 8)}</p>
+                                <p class="text-gray-400 text-xs">${formatTime(p.check_in_time)}</p>
                             </div>
                         </div>
                         <span class="px-2 py-1 rounded-full text-xs font-medium ${getCategoryBadge(p.triage_category)}">${p.triage_category}</span>
@@ -166,56 +173,34 @@
                             <span class="text-gray-500">Status:</span>
                             <span class="px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(p.status)}">${p.status}</span>
                         </div>
+                        <div class="text-gray-500">
+                            <span>Symptoms: ${p.symptoms ? p.symptoms.join(', ') : 'None'}</span>
+                        </div>
+                        ${p.assigned_bed ? `
                         <div class="flex justify-between">
-                            <span class="text-gray-500">Check-in:</span>
-                            <span class="text-gray-700">${formatTime(p.check_in_time)}</span>
-                        </div>
-                        ${p.discharge_time ? `
-                        <div class="flex justify-between">
-                            <span class="text-gray-500">Discharged:</span>
-                            <span class="text-gray-700">${formatTime(p.discharge_time)}</span>
-                        </div>
-                        ` : ''}
-                        <div class="flex justify-between">
-                            <span class="text-gray-500">Symptoms:</span>
-                            <span class="text-gray-700 truncate">${p.symptoms ? p.symptoms.join(', ') : 'None'}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="border-t border-gray-100 pt-3">
-                        <p class="text-xs text-gray-500 mb-2">Assigned Staff:</p>
-                        <div class="flex flex-wrap gap-1">
-                            ${p.assigned_doctors && p.assigned_doctors.length > 0 ? 
-                                p.assigned_doctors.map(d => `<span class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded">Dr. ${getStaffNameById(d)}</span>`).join('') : 
-                                '<span class="text-xs text-gray-400">No doctor</span>'}
-                        </div>
-                        <div class="flex flex-wrap gap-1 mt-1">
-                            ${p.assigned_nurses && p.assigned_nurses.length > 0 ? 
-                                p.assigned_nurses.map(n => `<span class="text-xs bg-green-50 text-green-600 px-2 py-1 rounded">${getStaffNameById(n)}</span>`).join('') : 
-                                '<span class="text-xs text-gray-400">No nurses</span>'}
-                        </div>
-                    </div>
-                    
-                    ${p.assigned_bed ? `
-                    <div class="border-t border-gray-100 pt-3 mt-3">
-                        <div class="flex justify-between text-sm">
                             <span class="text-gray-500">Bed:</span>
                             <span class="text-gray-700 font-medium">${p.assigned_bed}</span>
                         </div>
+                        ` : ''}
                     </div>
-                    ` : ''}
+                    
+                    <div class="border-t border-gray-100 pt-3 mt-3">
+                        <div class="text-xs text-gray-500 mb-2">Assigned Staff:</div>
+                        <div class="flex flex-wrap gap-1">
+                            ${p.assigned_doctors && p.assigned_doctors.length > 0 ? 
+                                p.assigned_doctors.map(d => `<span class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded">Dr. ${getStaffNameById(d)}</span>`).join('') : 
+                                ''}
+                            ${p.assigned_nurses && p.assigned_nurses.length > 0 ? 
+                                p.assigned_nurses.map(n => `<span class="text-xs bg-green-50 text-green-600 px-2 py-1 rounded">${getStaffNameById(n)}</span>`).join('') : 
+                                ''}
+                        </div>
+                    </div>
                 </div>
             `).join('');
         }
 
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                filterPatients(this.dataset.filter);
-            });
-        });
-
-        loadPatients();
-        setInterval(loadPatients, 15000);
+        init();
+        setInterval(loadMyPatients, 10000);
     </script>
 </body>
 </html>
