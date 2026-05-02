@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TriageFlow - Staff Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white border-b border-gray-200 px-6 py-3 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3 text-blue-600 text-xl font-bold">
+                <i class="fa-solid fa-heart-pulse text-2xl"></i>
+                <span>TriageFlow</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-gauge mr-2"></i>Dashboard</a>
+                <a href="/patient-intake" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-user-plus mr-2"></i>Patient Intake</a>
+                <a href="/staff" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"><i class="fa-solid fa-users mr-2"></i>Staff</a>
+                <a href="/condition-x" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-virus mr-2"></i>Condition X</a>
+                <a href="/settings" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-cog mr-2"></i>Settings</a>
+                <a href="/all-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users-list mr-2"></i>All Patients</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="p-8 max-w-6xl mx-auto">
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold text-gray-900 mb-2"><i class="fa-solid fa-users-gear mr-2"></i>Staff Management</h1>
+            <p class="text-gray-500">Monitor and manage hospital staff allocation</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-green-100 text-green-600 flex items-center justify-center text-xl"><i class="fa-solid fa-user-check"></i></div>
+                <div><h3 class="text-2xl font-bold text-gray-900" id="staffAvailable">0</h3><p class="text-gray-500 text-sm">Available</p></div>
+            </div>
+            <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center text-xl"><i class="fa-solid fa-user-injured"></i></div>
+                <div><h3 class="text-2xl font-bold text-gray-900" id="staffBusy">0</h3><p class="text-gray-500 text-sm">Busy with Patient</p></div>
+            </div>
+            <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl"><i class="fa-solid fa-mug-hot"></i></div>
+                <div><h3 class="text-2xl font-bold text-gray-900" id="staffBreak">0</h3><p class="text-gray-500 text-sm">On Break</p></div>
+            </div>
+            <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-gray-100 text-gray-600 flex items-center justify-center text-xl"><i class="fa-solid fa-user-clock"></i></div>
+                <div><h3 class="text-2xl font-bold text-gray-900" id="staffOffline">0</h3><p class="text-gray-500 text-sm">Off Duty</p></div>
+            </div>
+        </div>
+
+        <div class="flex gap-2 mb-6">
+            <button class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium filter-btn active" data-role="all">All Staff</button>
+            <button class="px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 font-medium filter-btn" data-role="Doctor">Doctors</button>
+            <button class="px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 font-medium filter-btn" data-role="Nurse">Nurses</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="staffGrid">
+            <div class="text-center py-8 text-gray-500">Loading staff data...</div>
+        </div>
+    </div>
+
+    <script>
+        async function loadStaff() {
+            try {
+                const response = await fetch('/api/staff');
+                const staff = await response.json();
+                renderStaff(staff);
+                updateStaffStats(staff);
+            } catch (error) {
+                console.error('Error loading staff:', error);
+            }
+        }
+
+        function renderStaff(staff) {
+            const grid = document.getElementById('staffGrid');
+            const roleFilter = document.querySelector('.filter-btn.active').dataset.role;
+            const filteredStaff = roleFilter === 'all' ? staff : staff.filter(s => s.role === roleFilter);
+            
+            grid.innerHTML = filteredStaff.map(s => `
+                <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
+                    <div class="flex items-center justify-between">
+                        <div class="w-12 h-12 ${s.role === 'Doctor' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'} rounded-full flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-user-${s.role === 'Doctor' ? 'md' : 'nurse'}"></i>
+                        </div>
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${s.status === 'available' ? 'bg-green-100 text-green-700' : s.status === 'busy' ? 'bg-red-100 text-red-700' : s.status === 'break' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}">
+                            <span class="w-2 h-2 rounded-full bg-current inline-block mr-1"></span>
+                            ${s.status.charAt(0).toUpperCase() + s.status.slice(1)}
+                        </span>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-900">${s.name}</h4>
+                        <p class="text-blue-600 font-medium text-sm">${s.role}</p>
+                        <div class="flex justify-between items-center mt-2">
+                            <div>
+                                <p class="text-gray-500 text-xs">ID: ${s.staff_id}</p>
+                                <p class="text-gray-500 text-xs"><i class="fa-solid fa-clock mr-1"></i>${s.shift} shift</p>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-lg font-bold ${s.patient_count > 0 ? 'text-blue-600' : 'text-gray-400'}">${s.patient_count || 0}</span>
+                                <p class="text-xs text-gray-500">patients</p>
+                            </div>
+                        </div>
+                    </div>
+                    <select onchange="updateStaffStatus('${s._id}', this.value)" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                        <option value="">Change Status</option>
+                        <option value="available">Available</option>
+                        <option value="busy">Busy</option>
+                        <option value="break">On Break</option>
+                        <option value="off-duty">Off Duty</option>
+                    </select>
+                </div>
+            `).join('');
+        }
+
+        function updateStaffStats(staff) {
+            const counts = { available: 0, busy: 0, break: 0, 'off-duty': 0 };
+            staff.forEach(s => counts[s.status] = (counts[s.status] || 0) + 1);
+            document.getElementById('staffAvailable').textContent = counts.available;
+            document.getElementById('staffBusy').textContent = counts.busy;
+            document.getElementById('staffBreak').textContent = counts.break || 0;
+            document.getElementById('staffOffline').textContent = counts['off-duty'] || 0;
+        }
+
+        async function updateStaffStatus(staffId, status) {
+            if (!status) return;
+            try {
+                await fetch(`/api/staff/${staffId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+                loadStaff();
+            } catch (error) {
+                console.error('Error updating staff status:', error);
+            }
+        }
+
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.remove('bg-blue-600', 'text-white');
+                this.classList.add('bg-blue-600', 'text-white');
+                loadStaff();
+            });
+        });
+
+        loadStaff();
+        setInterval(loadStaff, 30000);
+    </script>
+</body>
+</html>

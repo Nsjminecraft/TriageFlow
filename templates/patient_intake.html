@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TriageFlow - Patient Intake</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white border-b border-gray-200 px-6 py-3 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3 text-blue-600 text-xl font-bold">
+                <i class="fa-solid fa-heart-pulse text-2xl"></i>
+                <span>TriageFlow</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-gauge mr-2"></i>Dashboard</a>
+                <a href="/patient-intake" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"><i class="fa-solid fa-user-plus mr-2"></i>Patient Intake</a>
+                <a href="/staff" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users mr-2"></i>Staff</a>
+                <a href="/condition-x" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-virus mr-2"></i>Condition X</a>
+                <a href="/settings" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-cog mr-2"></i>Settings</a>
+                <a href="/all-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users-list mr-2"></i>All Patients</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="p-8 max-w-3xl mx-auto">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+            <div class="text-center mb-8 pb-8 border-b border-gray-200">
+                <h2 class="text-2xl font-bold text-gray-900 mb-2"><i class="fa-solid fa-qrcode mr-2"></i>QR Code Check-In</h2>
+                <p class="text-gray-500 mb-6">Scan the QR code at the hospital entrance or enter manually below</p>
+                <div class="w-40 h-40 mx-auto border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-400">
+                    <i class="fa-solid fa-qrcode text-4xl mb-2"></i>
+                    <span class="text-sm">QR Scanner</span>
+                </div>
+            </div>
+
+            <form id="triageForm" class="space-y-6">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4"><i class="fa-solid fa-user mr-2"></i>Patient Information</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                            <input type="text" id="patientName" name="name" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Enter your full name" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                            <input type="tel" id="patientPhone" name="phone" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="(555) 123-4567" inputmode="numeric" pattern="[0-9]*" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-1"><i class="fa-solid fa-stethoscope mr-2"></i>Quick Triage Assessment</h3>
+                    <p class="text-gray-500 text-sm mb-4">Answer 3 quick questions to determine your priority level</p>
+                    
+                    <div class="bg-gray-50 rounded-lg p-5 mb-4">
+                        <label class="font-semibold text-gray-900 flex items-center gap-3 mb-3">
+                            <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">1</span>
+                            What is your main symptom or injury?
+                        </label>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="chest pain" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-heart mb-1"></i>
+                                    <div class="text-sm">Chest Pain</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="difficulty breathing" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-wind mb-1"></i>
+                                    <div class="text-sm">Breathing Issues</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="fracture" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-bone mb-1"></i>
+                                    <div class="text-sm">Fracture</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="severe bleeding" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-droplet mb-1"></i>
+                                    <div class="text-sm">Severe Bleeding</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="high fever" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-thermometer mb-1"></i>
+                                    <div class="text-sm">High Fever</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="severe headache" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-head-side mb-1"></i>
+                                    <div class="text-sm">Severe Headache</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="cough" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-lungs mb-1"></i>
+                                    <div class="text-sm">Cough</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="nausea" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-stomach mb-1"></i>
+                                    <div class="text-sm">Nausea/Vomiting</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="dizziness" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-spinner mb-1"></i>
+                                    <div class="text-sm">Dizziness</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="symptoms" value="mild pain" class="hidden">
+                                <div class="px-4 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all has-checked:bg-blue-50 has-checked:border-blue-500 has-checked:text-blue-600">
+                                    <i class="fa-solid fa-bandage mb-1"></i>
+                                    <div class="text-sm">Mild Pain</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-lg p-5 mb-4">
+                        <label class="font-semibold text-gray-900 flex items-center gap-3 mb-3">
+                            <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">2</span>
+                            How long have you had these symptoms?
+                        </label>
+                        <select name="duration" id="duration" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
+                            <option value="">Select duration...</option>
+                            <option value="less than 1 hour">Less than 1 hour</option>
+                            <option value="1-6 hours">1-6 hours</option>
+                            <option value="6-24 hours">6-24 hours</option>
+                            <option value="1-3 days">1-3 days</option>
+                            <option value="more than 3 days">More than 3 days</option>
+                        </select>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-lg p-5">
+                        <label class="font-semibold text-gray-900 flex items-center gap-3 mb-3">
+                            <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm">3</span>
+                            Are you having any trouble breathing?
+                        </label>
+                        <div class="flex gap-4">
+                            <label class="cursor-pointer flex-1 breathing-yes">
+                                <input type="radio" name="breathing_trouble" value="yes" class="hidden">
+                                <div class="px-6 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all font-medium" onclick="selectBreathing('yes')">
+                                    <i class="fa-solid fa-circle-xmark mr-2"></i> Yes
+                                </div>
+                            </label>
+                            <label class="cursor-pointer flex-1 breathing-no">
+                                <input type="radio" name="breathing_trouble" value="no" class="hidden" checked onclick="selectBreathing('no')">
+                                <div class="px-6 py-3 bg-green-50 border-2 border-green-500 rounded-lg text-center hover:border-blue-500 transition-all font-medium text-green-700">
+                                    <i class="fa-solid fa-circle-check mr-2"></i> No
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center pt-6 border-t border-gray-200">
+                    <button type="submit" class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-lg">
+                        <i class="fa-solid fa-paper-plane mr-2"></i>Submit Triage
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50" id="resultModal">
+        <div class="bg-white rounded-2xl p-10 text-center max-w-sm mx-4 shadow-xl">
+            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl text-green-700">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <h2 class="text-2xl font-bold mb-4">Triage Complete!</h2>
+            <div class="mb-4">
+                <span class="px-6 py-2 rounded-full text-lg font-bold" id="resultBadge">Simple</span>
+            </div>
+            <p class="text-gray-600 mb-2" id="resultMessage">You have been categorized as: <strong>Simple</strong></p>
+            <p class="text-gray-500 text-sm mb-6">Please proceed to the waiting area. A nurse will call you shortly.</p>
+            <button class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium" onclick="closeResult()">Close</button>
+        </div>
+    </div>
+
+    <script src="/static/js/triage.js"></script>
+</body>
+</html>

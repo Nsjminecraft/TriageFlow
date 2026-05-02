@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TriageFlow - All Patients</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white border-b border-gray-200 px-6 py-3 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3 text-blue-600 text-xl font-bold">
+                <i class="fa-solid fa-heart-pulse text-2xl"></i>
+                <span>TriageFlow</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-gauge mr-2"></i>Dashboard</a>
+                <a href="/patient-intake" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-user-plus mr-2"></i>Patient Intake</a>
+                <a href="/staff" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users mr-2"></i>Staff</a>
+                <a href="/condition-x" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-virus mr-2"></i>Condition X</a>
+                <a href="/settings" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-cog mr-2"></i>Settings</a>
+                <a href="/all-patients" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"><i class="fa-solid fa-users-list mr-2"></i>All Patients</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="p-8 max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900"><i class="fa-solid fa-users-list mr-2"></i>All Patients Today</h1>
+                <p class="text-gray-500" id="dateDisplay"></p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="filterPatients('all')" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium filter-btn" data-filter="all">All</button>
+                <button onclick="filterPatients('waiting')" class="px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 font-medium filter-btn" data-filter="waiting">Waiting</button>
+                <button onclick="filterPatients('admitted')" class="px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 font-medium filter-btn" data-filter="admitted">Admitted</button>
+                <button onclick="filterPatients('discharged')" class="px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 font-medium filter-btn" data-filter="discharged">Discharged</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="patientsGrid">
+            <div class="col-span-full text-center py-8 text-gray-500">Loading patients...</div>
+        </div>
+    </div>
+
+    <script>
+        let allPatients = [];
+        let staffData = [];
+        let currentFilter = 'all';
+
+        document.getElementById('dateDisplay').textContent = new Date().toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+
+        async function loadPatients() {
+            try {
+                const [patientsRes, staffRes] = await Promise.all([
+                    fetch('/api/all-patients'),
+                    fetch('/api/staff')
+                ]);
+                allPatients = await patientsRes.json();
+                staffData = await staffRes.json();
+                renderPatients();
+            } catch (error) {
+                console.error('Error loading patients:', error);
+                document.getElementById('patientsGrid').innerHTML = '<div class="col-span-full text-center py-8 text-red-500">Error loading patients</div>';
+            }
+        }
+
+        function getStaffNameById(staffId) {
+            const staff = staffData.find(s => s._id === staffId);
+            return staff ? staff.name : 'Unknown';
+        }
+
+        function formatTime(isoString) {
+            if (!isoString) return 'N/A';
+            const date = new Date(isoString);
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function formatDate(isoString) {
+            if (!isoString) return 'N/A';
+            const date = new Date(isoString);
+            return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+
+        function getCategoryColor(category) {
+            const colors = {
+                simple: 'bg-green-500',
+                attention: 'bg-yellow-500',
+                emergency: 'bg-orange-500',
+                critical: 'bg-red-600'
+            };
+            return colors[category] || 'bg-gray-500';
+        }
+
+        function getCategoryBadge(category) {
+            const badges = {
+                simple: 'bg-green-100 text-green-700',
+                attention: 'bg-yellow-100 text-yellow-700',
+                emergency: 'bg-orange-100 text-orange-700',
+                critical: 'bg-red-100 text-red-700'
+            };
+            return badges[category] || 'bg-gray-100 text-gray-700';
+        }
+
+        function getStatusBadge(status) {
+            const badges = {
+                waiting: 'bg-amber-100 text-amber-700',
+                admitted: 'bg-blue-100 text-blue-700',
+                discharged: 'bg-gray-100 text-gray-600'
+            };
+            return badges[status] || 'bg-gray-100 text-gray-700';
+        }
+
+        function filterPatients(status) {
+            currentFilter = status;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-white', 'text-gray-700', 'border-gray-200');
+            });
+            event.target.classList.remove('bg-white', 'text-gray-700', 'border-gray-200');
+            event.target.classList.add('bg-blue-600', 'text-white');
+            renderPatients();
+        }
+
+        function renderPatients() {
+            const grid = document.getElementById('patientsGrid');
+            const filtered = currentFilter === 'all' 
+                ? allPatients 
+                : allPatients.filter(p => p.status === currentFilter);
+            
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No patients found</div>';
+                return;
+            }
+            
+            grid.innerHTML = filtered.map(p => `
+                <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${getCategoryColor(p.triage_category)}">
+                                ${p.triage_category.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">${p.name || 'Anonymous'}</h4>
+                                <p class="text-gray-400 text-xs">ID: ${p._id.substring(0, 8)}</p>
+                            </div>
+                        </div>
+                        <span class="px-2 py-1 rounded-full text-xs font-medium ${getCategoryBadge(p.triage_category)}">${p.triage_category}</span>
+                    </div>
+                    
+                    <div class="space-y-2 text-sm mb-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Status:</span>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(p.status)}">${p.status}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Check-in:</span>
+                            <span class="text-gray-700">${formatTime(p.check_in_time)}</span>
+                        </div>
+                        ${p.discharge_time ? `
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Discharged:</span>
+                            <span class="text-gray-700">${formatTime(p.discharge_time)}</span>
+                        </div>
+                        ` : ''}
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">Symptoms:</span>
+                            <span class="text-gray-700 truncate">${p.symptoms ? p.symptoms.join(', ') : 'None'}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t border-gray-100 pt-3">
+                        <p class="text-xs text-gray-500 mb-2">Assigned Staff:</p>
+                        <div class="flex flex-wrap gap-1">
+                            ${p.assigned_doctors && p.assigned_doctors.length > 0 ? 
+                                p.assigned_doctors.map(d => `<span class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded">Dr. ${getStaffNameById(d)}</span>`).join('') : 
+                                '<span class="text-xs text-gray-400">No doctor</span>'}
+                        </div>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            ${p.assigned_nurses && p.assigned_nurses.length > 0 ? 
+                                p.assigned_nurses.map(n => `<span class="text-xs bg-green-50 text-green-600 px-2 py-1 rounded">${getStaffNameById(n)}</span>`).join('') : 
+                                '<span class="text-xs text-gray-400">No nurses</span>'}
+                        </div>
+                    </div>
+                    
+                    ${p.assigned_bed ? `
+                    <div class="border-t border-gray-100 pt-3 mt-3">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-500">Bed:</span>
+                            <span class="text-gray-700 font-medium">${p.assigned_bed}</span>
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                filterPatients(this.dataset.filter);
+            });
+        });
+
+        loadPatients();
+        setInterval(loadPatients, 15000);
+    </script>
+</body>
+</html>

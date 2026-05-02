@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TriageFlow - Hospital Settings</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white border-b border-gray-200 px-6 py-3 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3 text-blue-600 text-xl font-bold">
+                <i class="fa-solid fa-heart-pulse text-2xl"></i>
+                <span>TriageFlow</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-gauge mr-2"></i>Dashboard</a>
+                <a href="/patient-intake" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-user-plus mr-2"></i>Patient Intake</a>
+                <a href="/staff" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users mr-2"></i>Staff</a>
+                <a href="/condition-x" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-virus mr-2"></i>Condition X</a>
+                <a href="/settings" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"><i class="fa-solid fa-cog mr-2"></i>Settings</a>
+                <a href="/all-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users-list mr-2"></i>All Patients</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="p-8 max-w-6xl mx-auto">
+        <h1 class="text-2xl font-bold text-gray-900 mb-2 text-center"><i class="fa-solid fa-cog mr-2"></i>Hospital Configuration</h1>
+        <p class="text-gray-500 mb-8 text-center">Configure hospital wings, beds, and staff</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4"><i class="fa-solid fa-building mr-2"></i>Hospital Wings</h2>
+                <div class="mb-4">
+                    <div class="flex gap-2">
+                        <input type="text" id="newWingName" placeholder="New wing name..." class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <button onclick="addWing()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="wingsList" class="space-y-2 max-h-48 overflow-y-auto">
+                    <div class="text-center py-4 text-gray-500">Loading wings...</div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4"><i class="fa-solid fa-bed mr-2"></i>Add Beds to Wing</h2>
+                <form id="bedConfigForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Select Wing</label>
+                        <select id="bedWing" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required>
+                            <option value="">Choose a wing...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Bed Type</label>
+                        <select id="bedType" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            <option value="general">General</option>
+                            <option value="icu">ICU</option>
+                            <option value="emergency">Emergency</option>
+                            <option value="observation">Observation</option>
+                            <option value="surgery">Surgery</option>
+                            <option value="pediatrics">Pediatrics</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Number of Beds</label>
+                            <input type="number" id="bedCount" min="1" max="100" value="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Start Number</label>
+                            <input type="number" id="startNumber" min="1" value="500" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                        <i class="fa-solid fa-save mr-2"></i>Configure Beds
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4"><i class="fa-solid fa-user-md mr-2"></i>Staff Management</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Staff Name</label>
+                    <input type="text" id="staffName" placeholder="Dr. Smith" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                    <select id="staffRole" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <option value="Doctor">Doctor</option>
+                        <option value="Nurse">Nurse</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Shift</label>
+                    <select id="staffShift" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <option value="morning">Morning</option>
+                        <option value="evening">Evening</option>
+                        <option value="night">Night</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Initial Status</label>
+                    <select id="staffStatus" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <option value="available">Available</option>
+                        <option value="busy">Busy</option>
+                        <option value="break">On Break</option>
+                        <option value="off-duty">Off Duty</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button onclick="addStaff()" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
+                        <i class="fa-solid fa-user-plus mr-2"></i>Add Staff
+                    </button>
+                </div>
+            </div>
+            <div id="staffList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
+                <div class="text-center py-4 text-gray-500 col-span-3">Loading staff...</div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4"><i class="fa-solid fa-layer-group mr-2"></i>Current Bed Layout</h2>
+            <div id="bedLayout" class="grid grid-cols-1 gap-4">
+                <div class="text-center py-8 text-gray-500">Loading bed layout...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let wings = [];
+        let allBeds = [];
+        let allStaff = [];
+
+        async function loadWings() {
+            try {
+                const response = await fetch('/api/wings');
+                wings = await response.json();
+                renderWings();
+                updateWingSelect();
+                loadBedLayout();
+                loadStaff();
+            } catch (error) {
+                console.error('Error loading wings:', error);
+            }
+        }
+
+        function renderWings() {
+            const list = document.getElementById('wingsList');
+            if (wings.length === 0) {
+                list.innerHTML = '<div class="text-center py-4 text-gray-500">No wings configured</div>';
+                return;
+            }
+            list.innerHTML = wings.map(w => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span class="font-medium text-gray-900">${w.name}</span>
+                    <button onclick="deleteWing('${w._id}')" class="text-red-500 hover:text-red-700">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function updateWingSelect() {
+            const select = document.getElementById('bedWing');
+            select.innerHTML = '<option value="">Choose a wing...</option>' + 
+                wings.map(w => `<option value="${w.name}">${w.name}</option>`).join('');
+        }
+
+        async function addWing() {
+            const name = document.getElementById('newWingName').value.trim();
+            if (!name) return;
+            
+            try {
+                const response = await fetch('/api/wings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('newWingName').value = '';
+                    loadWings();
+                } else {
+                    alert(result.error || 'Error adding wing');
+                }
+            } catch (error) {
+                console.error('Error adding wing:', error);
+            }
+        }
+
+        async function deleteWing(wingId) {
+            if (!confirm('Delete this wing? All beds in this wing will also be removed.')) return;
+            
+            try {
+                await fetch(`/api/wings/${wingId}`, { method: 'DELETE' });
+                loadWings();
+                loadBedLayout();
+            } catch (error) {
+                console.error('Error deleting wing:', error);
+            }
+        }
+
+        document.getElementById('bedConfigForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                wing: document.getElementById('bedWing').value,
+                type: document.getElementById('bedType').value,
+                count: parseInt(document.getElementById('bedCount').value),
+                start_number: parseInt(document.getElementById('startNumber').value)
+            };
+            
+            try {
+                const response = await fetch('/api/configure-beds', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert(`Successfully added ${result.beds_created} beds to ${result.wing}`);
+                    loadBedLayout();
+                } else {
+                    alert(result.error || 'Error configuring beds');
+                }
+            } catch (error) {
+                console.error('Error configuring beds:', error);
+            }
+        });
+
+        async function loadStaff() {
+            try {
+                const response = await fetch('/api/staff');
+                allStaff = await response.json();
+                renderStaff();
+            } catch (error) {
+                console.error('Error loading staff:', error);
+            }
+        }
+
+        function renderStaff() {
+            const list = document.getElementById('staffList');
+            if (allStaff.length === 0) {
+                list.innerHTML = '<div class="text-center py-4 text-gray-500 col-span-3">No staff added</div>';
+                return;
+            }
+            
+            list.innerHTML = allStaff.map(s => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full ${s.role === 'Doctor' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'} flex items-center justify-center">
+                            <i class="fa-solid fa-${s.role === 'Doctor' ? 'user-md' : '-user-nurse'}"></i>
+                        </div>
+                        <div>
+                            <div class="font-medium text-gray-900">${s.name}</div>
+                            <div class="text-sm text-gray-500">${s.role} • ${s.shift} shift • ID: ${s.staff_id}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium ${getStaffStatusClass(s.status)}">${s.status}</span>
+                        <button onclick="deleteStaff('${s._id}')" class="text-red-500 hover:text-red-700">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getStaffStatusClass(status) {
+            const classes = {
+                available: 'bg-green-100 text-green-700',
+                busy: 'bg-red-100 text-red-700',
+                break: 'bg-amber-100 text-amber-700',
+                'off-duty': 'bg-gray-100 text-gray-600'
+            };
+            return classes[status] || 'bg-gray-100 text-gray-600';
+        }
+
+        async function addStaff() {
+            const name = document.getElementById('staffName').value.trim();
+            const role = document.getElementById('staffRole').value;
+            const shift = document.getElementById('staffShift').value;
+            const status = document.getElementById('staffStatus').value;
+            
+            if (!name) {
+                alert('Please enter a staff name');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/staff', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, role, shift, status })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('staffName').value = '';
+                    loadStaff();
+                } else {
+                    alert(result.error || 'Error adding staff');
+                }
+            } catch (error) {
+                console.error('Error adding staff:', error);
+            }
+        }
+
+        async function deleteStaff(staffId) {
+            if (!confirm('Remove this staff member?')) return;
+            
+            try {
+                await fetch(`/api/staff/${staffId}`, { method: 'DELETE' });
+                loadStaff();
+            } catch (error) {
+                console.error('Error removing staff:', error);
+            }
+        }
+
+        async function loadBedLayout() {
+            try {
+                const response = await fetch('/api/beds');
+                allBeds = await response.json();
+                renderBedLayout();
+            } catch (error) {
+                console.error('Error loading beds:', error);
+            }
+        }
+
+        function renderBedLayout() {
+            const layout = document.getElementById('bedLayout');
+            if (allBeds.length === 0) {
+                layout.innerHTML = '<div class="text-center py-8 text-gray-500">No beds configured</div>';
+                return;
+            }
+            
+            const clearAllBtn = allBeds.length > 0 ? 
+                `<button onclick="removeAllBeds()" class="px-3 py-1 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"><i class="fa-solid fa-trash mr-1"></i> Clear All Beds</button>` : '';
+            
+            const wingsMap = {};
+            allBeds.forEach(b => {
+                if (!wingsMap[b.wing]) wingsMap[b.wing] = [];
+                wingsMap[b.wing].push(b);
+            });
+            
+            layout.innerHTML = `
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">Current Beds (${allBeds.length} total)</h3>
+                    ${clearAllBtn}
+                </div>
+            ` + Object.entries(wingsMap).map(([wing, wingBeds]) => `
+                <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
+                    <div class="bg-gray-100 px-4 py-3 font-semibold text-gray-900 flex justify-between items-center">
+                        <span>${wing}</span>
+                        <button onclick="removeAllBedsInWing('${wing.replace(/'/g, "\\'")}')" class="text-red-500 hover:text-red-700 text-sm">
+                            <i class="fa-solid fa-trash mr-1"></i>Remove All
+                        </button>
+                    </div>
+                    <div class="p-4">
+                        <div class="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-3">
+                            ${wingBeds.map(b => `
+                                <div class="relative group">
+                                    <div class="w-16 h-16 rounded-lg flex items-center justify-center text-sm font-semibold ${getBedClass(b.status)} cursor-pointer hover:scale-105 transition-transform" 
+                                         title="Bed ${b.bed_number} - ${b.type}"
+                                         onclick="removeBed('${b._id}')">
+                                        ${b.bed_number}
+                                    </div>
+                                    <div class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                         onclick="event.stopPropagation(); removeBed('${b._id}')"
+                                         title="Remove bed">
+                                        <i class="fa-solid fa-times"></i>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="mt-3 text-sm text-gray-500 flex gap-4">
+                            <span>${wingBeds.filter(b => b.status === 'available').length} available</span>
+                            <span>${wingBeds.filter(b => b.status === 'occupied').length} occupied</span>
+                            <span>${wingBeds.filter(b => b.status === 'cleaning').length} cleaning</span>
+                            <span class="font-medium">Total: ${wingBeds.length}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getBedClass(status) {
+            const classes = {
+                available: 'bg-emerald-100 text-emerald-700 border-2 border-emerald-300',
+                occupied: 'bg-red-100 text-red-700 border-2 border-red-300',
+                cleaning: 'bg-amber-100 text-amber-700 border-2 border-amber-300'
+            };
+            return classes[status] || 'bg-gray-100 text-gray-700 border-2 border-gray-300';
+        }
+
+        async function removeBed(bedId) {
+            if (!confirm('Remove this bed?')) return;
+            
+            try {
+                await fetch(`/api/beds/${bedId}`, { method: 'DELETE' });
+                loadBedLayout();
+            } catch (error) {
+                console.error('Error removing bed:', error);
+            }
+        }
+
+        async function removeAllBedsInWing(wing) {
+            if (!confirm(`Remove ALL beds in ${wing}?`)) return;
+            
+            try {
+                const response = await fetch('/api/beds');
+                const beds = await response.json();
+                
+                const wingBeds = beds.filter(b => b.wing === wing);
+                
+                if (wingBeds.length === 0) {
+                    alert('No beds in this wing');
+                    return;
+                }
+                
+                for (const bed of wingBeds) {
+                    await fetch(`/api/beds/${bed._id}`, { method: 'DELETE' });
+                }
+                
+                loadBedLayout();
+                alert('Beds removed');
+            } catch (error) {
+                console.error('Error removing beds:', error);
+                alert('Error removing beds: ' + error.message);
+            }
+        }
+
+        async function removeAllBeds() {
+            if (!confirm('Remove ALL beds from all wings?')) return;
+            
+            try {
+                const response = await fetch('/api/beds');
+                const beds = await response.json();
+                
+                for (const bed of beds) {
+                    await fetch(`/api/beds/${bed._id}`, { method: 'DELETE' });
+                }
+                
+                loadBedLayout();
+                alert('All beds removed');
+            } catch (error) {
+                console.error('Error removing all beds:', error);
+                alert('Error removing beds');
+            }
+        }
+
+        loadWings();
+    </script>
+</body>
+</html>
