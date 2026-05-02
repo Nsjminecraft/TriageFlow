@@ -102,6 +102,10 @@ def login_page():
         return redirect('/dashboard')
     return render_template('login.html')
 
+@app.route('/login-qr')
+def login_qr_page():
+    return render_template('login-qr.html')
+
 @app.route('/dashboard')
 def dashboard():
     if not require_login():
@@ -428,8 +432,9 @@ def auto_assign(patient_id):
     }))
     
     for doc in available_doctors:
+        doc_str_id = str(doc['_id'])
         doc['current_count'] = patients_collection.count_documents({
-            'assigned_doctors': doc['_id'],
+            'assigned_doctors': doc_str_id,
             'status': {'$ne': 'discharged'}
         })
     
@@ -454,8 +459,9 @@ def auto_assign(patient_id):
     }))
     
     for nurse in available_nurses:
+        nurse_str_id = str(nurse['_id'])
         nurse['current_count'] = patients_collection.count_documents({
-            'assigned_nurses': nurse['_id'],
+            'assigned_nurses': nurse_str_id,
             'status': {'$ne': 'discharged'}
         })
     

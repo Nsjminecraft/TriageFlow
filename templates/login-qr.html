@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TriageFlow - Login QR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+            min-height: 100vh;
+        }
+        .qr-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    <div class="qr-container text-center">
+        <div class="text-blue-600 text-4xl font-bold mb-2">
+            <i class="fa-solid fa-heart-pulse"></i> TriageFlow
+        </div>
+        <p class="text-gray-600 mb-6">Scan to access login</p>
+        <div id="qrcode" class="flex justify-center mb-4"></div>
+        <p class="text-gray-500 text-sm">https://flow.niranjansj.club/login</p>
+    </div>
+
+    <script>
+        new QRCode(document.getElementById("qrcode"), {
+            text: "https://flow.niranjansj.club/login",
+            width: 256,
+            height: 256,
+            colorDark : "#1e3a5f",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+    </script>
+</body>
+</html>
