@@ -16,7 +16,9 @@
             </div>
             <div class="flex items-center gap-2">
                 <a href="/dashboard" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-gauge mr-2"></i>Dashboard</a>
+                {% if user_role != 'Admin' %}
                 <a href="/my-patients" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-user-injured mr-2"></i>My Patients</a>
+                {% endif %}
                 <a href="/waiting-room" class="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"><i class="fa-solid fa-users-viewfinder mr-2"></i>Waiting Room</a>
                 <a href="/staff" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users mr-2"></i>Staff</a>
                 <a href="/condition-x" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-virus mr-2"></i>Condition X</a>
@@ -36,9 +38,66 @@
                 <h1 class="text-2xl font-bold text-gray-900"><i class="fa-solid fa-users-viewfinder mr-2"></i>Waiting Room</h1>
                 <p class="text-gray-500">Patients who have checked in and are waiting</p>
             </div>
-            <button onclick="loadArrivedPatients()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
-                <i class="fa-solid fa-refresh mr-2"></i>Refresh
-            </button>
+            <div class="flex gap-2">
+                <button onclick="toggleAddForm()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
+                    <i class="fa-solid fa-plus mr-2"></i>Add Patient
+                </button>
+                <button onclick="loadArrivedPatients()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                    <i class="fa-solid fa-refresh mr-2"></i>Refresh
+                </button>
+            </div>
+        </div>
+
+        <div id="addPatientForm" class="hidden bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4"><i class="fa-solid fa-user-plus mr-2"></i>Add Patient to Waiting Room</h3>
+            <form onsubmit="addPatient(event)" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                        <input type="text" id="addName" name="name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Age *</label>
+                        <input type="number" id="addAge" name="age" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" min="1" max="150" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Gender *</label>
+                        <select id="addGender" name="gender" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                            <option value="">Select...</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input type="tel" id="addPhone" name="phone" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Triage Category *</label>
+                        <select id="addCategory" name="triage_category" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                            <option value="simple">Simple - Low Priority</option>
+                            <option value="attention">Attention - Wait Time</option>
+                            <option value="emergency">Emergency - Priority</option>
+                            <option value="critical">Critical - Immediate</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Symptoms</label>
+                    <input type="text" id="addSymptoms" name="symptoms" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g., chest pain, cough, fever">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
+                        <i class="fa-solid fa-check mr-2"></i>Add to Waiting Room
+                    </button>
+                    <button type="button" onclick="toggleAddForm()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium">
+                        Cancel
+                    </button>
+                </div>
+            </form>
         </div>
 
         <div id="arrivedPatients" class="space-y-4">
@@ -57,50 +116,108 @@
                         return;
                     }
                     
-                    container.innerHTML = patients.map(p => {
-                        const categoryColors = {
-                            simple: 'bg-green-100 text-green-700',
-                            attention: 'bg-yellow-100 text-yellow-700',
-                            emergency: 'bg-orange-100 text-orange-700',
-                            critical: 'bg-red-100 text-red-700'
-                        };
-                        const isCalled = p.called ? 'opacity-60' : '';
-                        
-                        return `
-                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 ${isCalled}">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-4">
-                                        <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-bold">
-                                            #${p.queue_number || '?'}
-                                        </div>
-                                        <div>
-                                            <div class="font-semibold text-gray-900">${p.name}</div>
-                                            <div class="text-sm text-gray-500">
-                                                ${p.age || '?'} years old • ${p.gender || 'N/A'} • 
-                                                <span class="px-2 py-0.5 rounded-full text-xs ${categoryColors[p.triage_category] || 'bg-gray-100'}">
-                                                    ${p.triage_category || 'simple'}
-                                                </span>
+                    const waitingPatients = patients.filter(p => p.status === 'waiting');
+                    const arrivedPatients = patients.filter(p => p.status === 'arrived');
+                    
+                    const categoryColors = {
+                        simple: 'bg-green-100 text-green-700',
+                        attention: 'bg-yellow-100 text-yellow-700',
+                        emergency: 'bg-orange-100 text-orange-700',
+                        critical: 'bg-red-100 text-red-700'
+                    };
+                    
+                    let html = '';
+                    
+                    if (waitingPatients.length > 0) {
+                        html += `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                                    <i class="fa-solid fa-clock text-yellow-600"></i>
+                                    Waiting for Check-In (${waitingPatients.length})
+                                </h3>
+                                <div class="space-y-3">
+                                    ${waitingPatients.map(p => `
+                                        <div class="bg-yellow-50 rounded-lg border border-yellow-200 p-4">
+                                            <div class="flex items-center justify-between">
+                                                <div class="flex items-center gap-4">
+                                                    <div class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center">
+                                                        <i class="fa-solid fa-user-clock"></i>
+                                                    </div>
+                                                    <div>
+                                                        <div class="font-semibold text-gray-900">${p.name}</div>
+                                                        <div class="text-sm text-gray-500">
+                                                            ${p.age || '?'} years old • 
+                                                            <span class="px-2 py-0.5 rounded-full text-xs ${categoryColors[p.triage_category] || 'bg-gray-100'}">
+                                                                ${p.triage_category || 'simple'}
+                                                            </span>
+                                                        </div>
+                                                        <div class="text-sm text-gray-500 mt-1">
+                                                            Check-in: ${p.check_in_time ? new Date(p.check_in_time).toLocaleTimeString() : 'Unknown'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button onclick="markArrived('${p._id}', '${p.name}')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                                                    <i class="fa-solid fa-check mr-2"></i>Check In
+                                                </button>
                                             </div>
-                                            <div class="text-sm text-gray-500 mt-1">
-                                                <i class="fa-solid fa-clock mr-1"></i>
-                                                Arrived: ${p.arrival_time ? new Date(p.arrival_time).toLocaleTimeString() : 'Unknown'}
-                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        ${p.called ? 
-                                            `<button class="px-4 py-2 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed" disabled>
-                                                <i class="fa-solid fa-check mr-2"></i>Called
-                                            </button>` :
-                                            `<button onclick="callPatient('${p._id}')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
-                                                <i class="fa-solid fa-bullhorn mr-2"></i>Call Name
-                                            </button>`
-                                        }
-                                    </div>
+                                    `).join('')}
                                 </div>
                             </div>
                         `;
-                    }).join('');
+                    }
+                    
+                    if (arrivedPatients.length > 0) {
+                        html += `
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                                    <i class="fa-solid fa-check-circle text-green-600"></i>
+                                    In Waiting Room (${arrivedPatients.length})
+                                </h3>
+                                <div class="space-y-3">
+                                    ${arrivedPatients.map(p => {
+                                        const isCalled = p.called ? 'opacity-60' : '';
+                                        return `
+                                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 ${isCalled}">
+                                                <div class="flex items-center justify-between">
+                                                    <div class="flex items-center gap-4">
+                                                        <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-bold">
+                                                            #${p.queue_number || '?'}
+                                                        </div>
+                                                        <div>
+                                                            <div class="font-semibold text-gray-900">${p.name}</div>
+                                                            <div class="text-sm text-gray-500">
+                                                                ${p.age || '?'} years old • ${p.gender || 'N/A'} • 
+                                                                <span class="px-2 py-0.5 rounded-full text-xs ${categoryColors[p.triage_category] || 'bg-gray-100'}">
+                                                                    ${p.triage_category || 'simple'}
+                                                                </span>
+                                                            </div>
+                                                            <div class="text-sm text-gray-500 mt-1">
+                                                                <i class="fa-solid fa-clock mr-1"></i>
+                                                                Arrived: ${p.arrival_time ? new Date(p.arrival_time).toLocaleTimeString() : 'Unknown'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex gap-2">
+                                                        ${p.called ? 
+                                                            `<button class="px-4 py-2 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed" disabled>
+                                                                <i class="fa-solid fa-check mr-2"></i>Called
+                                                            </button>` :
+                                                            `<button onclick="callPatient('${p._id}')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
+                                                                <i class="fa-solid fa-bullhorn mr-2"></i>Call Name
+                                                            </button>`
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    container.innerHTML = html;
                 })
                 .catch(err => {
                     console.error('Error loading patients:', err);
@@ -124,6 +241,82 @@
             .catch(err => {
                 console.error('Error calling patient:', err);
                 alert('Error calling patient');
+            });
+        }
+
+        function markArrived(patientId, patientName) {
+            if (!confirm(`Mark ${patientName} as checked in?`)) return;
+            
+            fetch('/api/mark-arrived', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ patient_id: patientId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`${patientName} checked in! Queue Number: #${data.queue_number}`);
+                    loadArrivedPatients();
+                }
+            })
+            .catch(err => {
+                console.error('Error marking arrived:', err);
+                alert('Error checking in patient');
+            });
+        }
+
+        function toggleAddForm() {
+            const form = document.getElementById('addPatientForm');
+            form.classList.toggle('hidden');
+        }
+
+        function addPatient(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('addName').value;
+            const age = document.getElementById('addAge').value;
+            const gender = document.getElementById('addGender').value;
+            const phone = document.getElementById('addPhone').value;
+            const triage_category = document.getElementById('addCategory').value;
+            const symptoms = document.getElementById('addSymptoms').value;
+            
+            const symptomsArray = symptoms ? symptoms.split(',').map(s => s.trim()) : [];
+            
+            const data = {
+                name: name,
+                age: parseInt(age),
+                gender: gender,
+                phone: phone,
+                triage_category: triage_category,
+                symptoms: symptomsArray,
+                arrived: true,
+                status: 'arrived'
+            };
+            
+            fetch('/api/add-to-waiting-room', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.success) {
+                    alert(`Patient added! Queue Number: #${result.queue_number}`);
+                    document.getElementById('addName').value = '';
+                    document.getElementById('addAge').value = '';
+                    document.getElementById('addGender').value = '';
+                    document.getElementById('addPhone').value = '';
+                    document.getElementById('addCategory').value = 'simple';
+                    document.getElementById('addSymptoms').value = '';
+                    toggleAddForm();
+                    loadArrivedPatients();
+                } else {
+                    alert('Error adding patient: ' + result.error);
+                }
+            })
+            .catch(err => {
+                console.error('Error adding patient:', err);
+                alert('Error adding patient');
             });
         }
 

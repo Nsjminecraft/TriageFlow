@@ -373,57 +373,61 @@ def get_triage_questions():
 
 @app.route('/api/submit-triage', methods=['POST'])
 def submit_triage():
-    data = request.json
-    symptoms = data.get('symptoms', [])
-    duration = data.get('duration', '')
-    breathing_trouble = data.get('breathing_trouble', 'no')
-    family_history = data.get('family_history', 'no')
-    substance_use = data.get('substance_use', 'no')
-    sexually_active = data.get('sexually_active', 'no')
-    medications = data.get('medications', '')
+    try:
+        data = request.json
+        symptoms = data.get('symptoms', [])
+        duration = data.get('duration', '')
+        breathing_trouble = data.get('breathing_trouble', 'no')
+        family_history = data.get('family_history', 'no')
+        substance_use = data.get('substance_use', 'no')
+        sexually_active = data.get('sexually_active', 'no')
+        medications = data.get('medications', '')
+        
+        triage_category = categorize_patient(symptoms, breathing_trouble)
     
-    triage_category = categorize_patient(symptoms, breathing_trouble)
-    
-    patient = {
-        'name': data.get('name', 'Anonymous'),
-        'age': data.get('age', 0),
-        'gender': data.get('gender', ''),
-        'phone': data.get('phone', ''),
-        'symptoms': symptoms,
-        'duration': duration,
-        'breathing_trouble': breathing_trouble == 'yes',
-        'family_history': family_history == 'yes',
-        'substance_use': substance_use == 'yes',
-        'sexually_active': sexually_active == 'yes',
-        'medications': medications,
-        'triage_category': triage_category,
-        'status': 'waiting',
-        'check_in_time': datetime.now(),
-        'assigned_bed': None,
-        'assigned_doctors': [],
-        'assigned_nurses': [],
-        'medication_history': [],
-        'allergies': []
-    }
-    
-    result = patients_collection.insert_one(patient)
-    patient['_id'] = str(result.inserted_id)
-    
-    triage_logs_collection.insert_one({
-        'patient_id': str(result.inserted_id),
-        'category': triage_category,
-        'timestamp': datetime.now(),
-        'symptoms': symptoms
-    })
-    
-    return jsonify({
-        'success': True,
-        'patient': patient,
-        'category': triage_category,
-        'patient_id': str(patient['_id']),
-        'name': patient['name'],
-        'queue_number': patients_collection.count_documents({'status': {'$ne': 'discharged'}}) + 1
-    })
+        patient = {
+            'name': data.get('name', 'Anonymous'),
+            'age': data.get('age', 0),
+            'gender': data.get('gender', ''),
+            'phone': data.get('phone', ''),
+            'symptoms': symptoms,
+            'duration': duration,
+            'breathing_trouble': breathing_trouble == 'yes',
+            'family_history': family_history == 'yes',
+            'substance_use': substance_use == 'yes',
+            'sexually_active': sexually_active == 'yes',
+            'medications': medications,
+            'triage_category': triage_category,
+            'status': 'waiting',
+            'check_in_time': datetime.now(),
+            'assigned_bed': None,
+            'assigned_doctors': [],
+            'assigned_nurses': [],
+            'medication_history': [],
+            'allergies': []
+        }
+        
+        result = patients_collection.insert_one(patient)
+        patient['_id'] = str(result.inserted_id)
+        
+        triage_logs_collection.insert_one({
+            'patient_id': str(result.inserted_id),
+            'category': triage_category,
+            'timestamp': datetime.now(),
+            'symptoms': symptoms
+        })
+        
+        return jsonify({
+            'success': True,
+            'patient': patient,
+            'category': triage_category,
+            'patient_id': str(patient['_id']),
+            'name': patient['name'],
+            'queue_number': patients_collection.count_documents({'status': {'$ne': 'discharged'}}) + 1
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({'success': False, 'error': str(e), 'trace': traceback.format_exc()})
 
 @app.route('/api/mark-arrived', methods=['POST'])
 def mark_arrived():
@@ -453,29 +457,75 @@ def mark_arrived():
 
 @app.route('/api/arrived-patients', methods=['GET'])
 def get_arrived_patients():
-    arrived = list(patients_collection.find({
-        'arrived': True,
-        'status': {'$ne': 'discharged'}
-    }).sort('queue_number', 1))
+    all_triaged = list(patients_collection.find({
+        'status': {'$in': ['waiting', 'arrived']}
+    }).sort('check_in_time', 1))
     
-    for p in arrived:
+    for p in all_triaged:
         p['_id'] = str(p['_id'])
         p['arrival_time'] = p.get('arrival_time').isoformat() if p.get('arrival_time') else None
         p['check_in_time'] = p.get('check_in_time').isoformat() if p.get('check_in_time') else None
     
-    return jsonify(arrived)
+    return jsonify(all_triaged)
 
 @app.route('/api/call-patient/<patient_id>', methods=['POST'])
-def call_patient():
-    data = request.json
-    patient_id = data.get('patient_id')
-    
+def call_patient(patient_id):
     patients_collection.update_one(
         {'_id': ObjectId(patient_id)},
         {'$set': {'called': True, 'called_at': datetime.now()}}
     )
     
     return jsonify({'success': True})
+
+@app.route('/api/add-to-waiting-room', methods=['POST'])
+def add_to_waiting_room():
+    data = request.json
+    
+    name = data.get('name', 'Unknown')
+    age = data.get('age', 0)
+    gender = data.get('gender', '')
+    phone = data.get('phone', '')
+    triage_category = data.get('triage_category', 'simple')
+    symptoms = data.get('symptoms', [])
+    
+    arrived_count = patients_collection.count_documents({
+        'arrived': True,
+        'status': {'$ne': 'discharged'}
+    })
+    
+    patient = {
+        'name': name,
+        'age': age,
+        'gender': gender,
+        'phone': phone,
+        'symptoms': symptoms,
+        'triage_category': triage_category,
+        'status': 'arrived',
+        'arrived': True,
+        'arrival_time': datetime.now(),
+        'queue_number': arrived_count + 1,
+        'called': False,
+        'check_in_time': datetime.now(),
+        'assigned_bed': None,
+        'assigned_doctors': [],
+        'assigned_nurses': [],
+        'medication_history': [],
+        'allergies': [],
+        'duration': '',
+        'breathing_trouble': False,
+        'family_history': False,
+        'substance_use': False,
+        'sexually_active': False,
+        'medications': ''
+    }
+    
+    result = patients_collection.insert_one(patient)
+    
+    return jsonify({
+        'success': True,
+        'patient_id': str(result.inserted_id),
+        'queue_number': arrived_count + 1
+    })
 
 @app.route('/api/auto-assign/<patient_id>', methods=['POST'])
 def auto_assign(patient_id):

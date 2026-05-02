@@ -153,14 +153,14 @@
                         </label>
                         <div class="flex gap-4">
                             <label class="cursor-pointer flex-1 breathing-yes">
-                                <input type="radio" name="breathing_trouble" value="yes" class="hidden">
-                                <div class="px-6 py-3 bg-blue-50 border-2 border-blue-500 rounded-lg text-center hover:border-blue-600 transition-all font-medium text-blue-700" onclick="selectBreathing('yes')">
+                                <input type="radio" name="breathing_trouble" value="yes" class="hidden" onchange="updateBreathingStyle(this)">
+                                <div class="px-6 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all font-medium">
                                     <i class="fa-solid fa-circle-xmark mr-2"></i> Yes
                                 </div>
                             </label>
                             <label class="cursor-pointer flex-1 breathing-no">
-                                <input type="radio" name="breathing_trouble" value="no" class="hidden" checked onclick="selectBreathing('no')">
-                                <div class="px-6 py-3 bg-blue-50 border-2 border-blue-500 rounded-lg text-center hover:border-blue-600 transition-all font-medium text-blue-700">
+                                <input type="radio" name="breathing_trouble" value="no" class="hidden" checked onchange="updateBreathingStyle(this)">
+                                <div class="px-6 py-3 bg-blue-50 border-2 border-blue-500 rounded-lg text-center hover:border-blue-600 transition-all font-medium text-blue-700 breathing-no-box">
                                     <i class="fa-solid fa-circle-check mr-2"></i> No
                                 </div>
                             </label>
@@ -174,13 +174,13 @@
                         </label>
                         <div class="flex gap-4">
                             <label class="cursor-pointer flex-1 family-history-yes">
-                                <input type="radio" name="family_history" value="yes" class="hidden">
-                                <div class="px-6 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all font-medium" onclick="selectFamilyHistory('yes')">
+                                <input type="radio" name="family_history" value="yes" class="hidden" onchange="updateStyle('family_history')">
+                                <div class="px-6 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all font-medium">
                                     <i class="fa-solid fa-circle-xmark mr-2"></i> Yes
                                 </div>
                             </label>
                             <label class="cursor-pointer flex-1 family-history-no">
-                                <input type="radio" name="family_history" value="no" class="hidden" checked onclick="selectFamilyHistory('no')">
+                                <input type="radio" name="family_history" value="no" class="hidden" checked onchange="updateStyle('family_history')">
                                 <div class="px-6 py-3 bg-blue-50 border-2 border-blue-500 rounded-lg text-center hover:border-blue-600 transition-all font-medium text-blue-700">
                                     <i class="fa-solid fa-circle-check mr-2"></i> No
                                 </div>
@@ -195,13 +195,13 @@
                         </label>
                         <div class="flex gap-4">
                             <label class="cursor-pointer flex-1 substance-yes">
-                                <input type="radio" name="substance_use" value="yes" class="hidden">
-                                <div class="px-6 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all font-medium" onclick="selectSubstance('yes')">
+                                <input type="radio" name="substance_use" value="yes" class="hidden" onchange="updateStyle('substance_use')">
+                                <div class="px-6 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all font-medium">
                                     <i class="fa-solid fa-circle-xmark mr-2"></i> Yes
                                 </div>
                             </label>
                             <label class="cursor-pointer flex-1 substance-no">
-                                <input type="radio" name="substance_use" value="no" class="hidden" checked onclick="selectSubstance('no')">
+                                <input type="radio" name="substance_use" value="no" class="hidden" checked onchange="updateStyle('substance_use')">
                                 <div class="px-6 py-3 bg-blue-50 border-2 border-blue-500 rounded-lg text-center hover:border-blue-600 transition-all font-medium text-blue-700">
                                     <i class="fa-solid fa-circle-check mr-2"></i> No
                                 </div>
@@ -216,13 +216,13 @@
                         </label>
                         <div class="flex gap-4">
                             <label class="cursor-pointer flex-1 sexually-active-yes">
-                                <input type="radio" name="sexually_active" value="yes" class="hidden">
-                                <div class="px-6 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all font-medium" onclick="selectSexuallyActive('yes')">
+                                <input type="radio" name="sexually_active" value="yes" class="hidden" onchange="updateStyle('sexually_active')">
+                                <div class="px-6 py-3 bg-white border-2 border-gray-200 rounded-lg text-center hover:border-blue-500 transition-all font-medium">
                                     <i class="fa-solid fa-circle-xmark mr-2"></i> Yes
                                 </div>
                             </label>
                             <label class="cursor-pointer flex-1 sexually-active-no">
-                                <input type="radio" name="sexually_active" value="no" class="hidden" checked onclick="selectSexuallyActive('no')">
+                                <input type="radio" name="sexually_active" value="no" class="hidden" checked onchange="updateStyle('sexually_active')">
                                 <div class="px-6 py-3 bg-blue-50 border-2 border-blue-500 rounded-lg text-center hover:border-blue-600 transition-all font-medium text-blue-700">
                                     <i class="fa-solid fa-circle-check mr-2"></i> No
                                 </div>
@@ -277,19 +277,30 @@
     </div>
 
     <script>
-        function selectBreathing(value) {
+        function updateBreathingStyle(changedRadio) {
             document.querySelectorAll('input[name="breathing_trouble"]').forEach(r => {
-                r.checked = (r.value === value);
                 const label = r.closest('label');
                 const box = label.querySelector('div');
-                box.classList.remove('bg-blue-50', 'bg-white', 'border-blue-500', 'border-gray-200', 'text-blue-700');
-                box.classList.add('bg-white', 'border-gray-200');
-                if (value === 'yes' && r.value === 'yes') {
+                if (r.checked) {
                     box.classList.remove('bg-white', 'border-gray-200');
                     box.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
-                } else if (value === 'no' && r.value === 'no') {
+                } else {
+                    box.classList.remove('bg-blue-50', 'border-blue-500', 'text-blue-700');
+                    box.classList.add('bg-white', 'border-gray-200');
+                }
+            });
+        }
+        
+        function updateStyle(radioName) {
+            document.querySelectorAll(`input[name="${radioName}"]`).forEach(r => {
+                const label = r.closest('label');
+                const box = label.querySelector('div');
+                if (r.checked) {
                     box.classList.remove('bg-white', 'border-gray-200');
                     box.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
+                } else {
+                    box.classList.remove('bg-blue-50', 'border-blue-500', 'text-blue-700');
+                    box.classList.add('bg-white', 'border-gray-200');
                 }
             });
         }
@@ -404,18 +415,28 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
+                if (!response.ok) {
+                    const errText = await response.text();
+                    console.error('Server error:', errText);
+                    alert('Error: ' + errText);
+                    return;
+                }
                 const result = await response.json();
                 if (result.success) {
+                    window.lastTriageResult = result;
                     showResult(result.category);
                     e.target.reset();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Error submitting:', error);
-                alert('Error submitting. Please try again.');
+                alert('Error submitting: ' + error.message);
             }
         });
 
         function showResult(category) {
+            const result = window.lastTriageResult || {patient_id: '', name: '', queue_number: ''};
             const colors = {
                 simple: 'bg-green-100 text-green-700',
                 attention: 'bg-yellow-100 text-yellow-700',
