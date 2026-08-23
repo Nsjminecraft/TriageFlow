@@ -20,22 +20,32 @@ patients_collection = db['patients']
 beds_collection = db['beds']
 staff_collection = db['staff']
 triage_logs_collection = db['triage_logs']
+ai_analyses_collection = db['ai_analyses']
 
 def init_database():
     wings_collection = db['wings']
-    if wings_collection.count_documents({}) == 0:
-        default_wings = ['Emergency', 'ICU', 'General', 'Observation', 'Pediatrics', 'Surgery']
-        for wing_name in default_wings:
-            wings_collection.insert_one({'name': wing_name})
-    
-    admins_collection = db['admins']
-    if admins_collection.count_documents({}) == 0:
-        admins_collection.insert_one({
-            'admin_id': 'ADMIN001',
-            'name': 'Hospital Admin',
-            'password': 'admin123'
-        })
-    
+# AI client initialization (supports NVIDIA NIM and OpenAI via the same openai SDK)
+ai_client = None
+AI_MODEL_NAME = ''
+try:
+    from openai import OpenAI
+    api_key = Config.get_ai_key()
+    placeholder_keys = ['your-openai-api-key-here', 'nvapi-your-nvidia-api-key-here', '']
+    if api_key and api_key not in placeholder_keys:
+        ai_client = OpenAI(
+            api_key=api_key,
+            base_url=Config.get_ai_base_url()
+        )
+        AI_MODEL_NAME = Config.get_ai_model()
+        print(f"[AI] Client initialized: provider={Config.AI_PROVIDER}, model={AI_MODEL_NAME}, base_url={Config.get_ai_base_url()}")
+    else:
+        print(f"[AI] WARNING: API key not set for provider '{Config.AI_PROVIDER}'. AI features will be disabled.")
+        print(f"[AI] Set NVIDIA_API_KEY in .env (get one free at https://build.nvidia.com)")
+except ImportError:
+    print("[AI] WARNING: openai package not installed. AI features will be disabled.")
+    print("[AI] Run: pip install openai")
+except Exception as e:
+    print(f"[AI] WARNING: Failed to initialize AI client: {e}")
     if beds_collection.count_documents({}) == 0:
         wings = ['Emergency', 'ICU', 'General', 'Observation']
         bed_types = {'Emergency': 'emergency', 'ICU': 'icu', 'General': 'general', 'Observation': 'observation'}
@@ -174,12 +184,6 @@ def settings_page():
 
 @app.route('/all-patients')
 def all_patients_page():
-    if not require_login():
-        return redirect('/login')
-    return render_template('all_patients.html', user_role=session.get('user_role'))
-
-@app.route('/waiting-room')
-def waiting_room_page():
     if not require_login():
         return redirect('/login')
     return render_template('waiting_room.html', user_role=session.get('user_role'))
@@ -433,6 +437,15 @@ def submit_triage():
 def mark_arrived():
     data = request.json
     patient_id = data.get('patient_id')
+        # Trigger AI analysis in background thread
+    if ai_client:
+        thread = threading.Thread(
+            target=generate_ai_analysis_async,
+            args=(str(result.inserted_id), patient)
+        )
+        thread.daemon = True
+        thread.start()
+        
     
     if not patient_id:
         return jsonify({'success': False, 'error': 'Patient ID required'})
@@ -886,53 +899,204 @@ def discharge_patient():
     
     return jsonify({'success': True})
 
-@app.route('/api/condition-x-status')
-def condition_x_status():
-    one_hour_ago = datetime.now() - timedelta(hours=1)
-    recent_logs = list(triage_logs_collection.find({'timestamp': {'$gte': one_hour_ago}}))
+def generate_ai_analysis(patient):
+    """Generate AI-powered clinical analysis for a patient."""
+    if not ai_client:
+        return None
     
-    breathing_count = sum(1 for log in recent_logs if log.get('symptoms') and 'breathing' in ' '.join(log['symptoms']).lower())
-    total_triages = len(recent_logs)
+    patient_data = {
+        'name': patient.get('name', 'Anonymous'),
+        'age': patient.get('age', 'Unknown'),
+        'gender': patient.get('gender', 'Unknown'),
+        'symptoms': patient.get('symptoms', []),
+        'duration': patient.get('duration', 'Unknown'),
+        'breathing_trouble': patient.get('breathing_trouble', False),
+        'family_history': patient.get('family_history', False),
+        'substance_use': patient.get('substance_use', False),
+        'sexually_active': patient.get('sexually_active', False),
+        'medications': patient.get('medications', ''),
+        'current_triage_category': patient.get('triage_category', 'unknown')
+    }
     
-    spike_detected = breathing_count >= 3 and total_triages >= 5
-    
-    category_counts = {'simple': 0, 'attention': 0, 'emergency': 0, 'critical': 0}
-    for log in recent_logs:
-        cat = log.get('category', 'simple')
-        category_counts[cat] = category_counts.get(cat, 0) + 1
-    
+    system_prompt = """You are an expert AI medical triage assistant embedded in a hospital management system called TriageFlow. 
+Your role is to analyze patient intake data and provide clinical insights to help medical staff make informed decisions.
+IMPORTANT: You are NOT providing medical diagnoses to patients. You are assisting medical professionals with clinical decision support.
+Respond ONLY with valid JSON (no markdown, no code blocks). Use this exact structure:
+{
+    "recommended_category": "simple|attention|emergency|critical",
+    "confidence": "high|medium|low",
+    "reasoning": "Brief explanation of why this triage category is recommended (2-3 sentences)",
+    "possible_conditions": [
+        {"name": "Condition name", "likelihood": "high|medium|low", "notes": "Brief note"}
+    ],
+    "suggested_tests": [
+        {"name": "Test name", "priority": "urgent|routine", "reason": "Why this test"}
+    ],
+    "risk_factors": ["Risk factor 1", "Risk factor 2"],
+    "clinical_summary": "A concise 3-4 sentence clinical summary for the attending physician",
+    "immediate_actions": ["Action 1", "Action 2"],
+    "patient_instructions": "Clear instructions to give the patient based on their condition",
+    "red_flags": ["Any warning signs to watch for"]
+}
+Be thorough but concise. Base your analysis on the provided patient data. Consider age, gender, and all symptoms together.
+For possible_conditions, list at most 5 conditions ranked by likelihood. For suggested_tests, list at most 5 tests.
+Always prioritize patient safety - when in doubt, recommend a higher triage category."""
+
+    user_prompt = f"""Analyze this patient intake data and provide a comprehensive clinical assessment:
+
+Patient: {patient_data['name']}, Age: {patient_data['age']}, Gender: {patient_data['gender']}
+Symptoms: {', '.join(patient_data['symptoms']) if patient_data['symptoms'] else 'None specified'}
+Duration: {patient_data['duration']}
+Breathing difficulty: {'Yes' if patient_data['breathing_trouble'] else 'No'}
+Family history: {'Yes' if patient_data['family_history'] else 'No'}
+Substance use: {'Yes' if patient_data['substance_use'] else 'No'}
+Sexually active: {'Yes' if patient_data['sexually_active'] else 'No'}
+Medications: {patient_data['medications'] if patient_data['medications'] else 'None reported'}
+Current rule-based triage: {patient_data['current_triage_category']}"""
+
+    try:
+        # Try with response_format first (supported by OpenAI and some NVIDIA NIM models)
+        try:
+            response = ai_client.chat.completions.create(
+                model=AI_MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=2000,
+                response_format={"type": "json_object"}
+            )
+        except Exception as fmt_err:
+            # Fallback: retry without response_format (some NVIDIA NIM models don't support it)
+            print(f"[AI] response_format not supported, retrying without it: {fmt_err}")
+            response = ai_client.chat.completions.create(
+                model=AI_MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=2000
+            )
+        content = response.choices[0].message.content
+        # Strip markdown code fences if the model wraps JSON in ```json ... ```
+        content = content.strip()
+        if content.startswith('```'):
+            lines = content.split('\n')
+            lines = [l for l in lines if not l.strip().startswith('```')]
+            content = '\n'.join(lines)
+        analysis = json.loads(content)
+        analysis['generated_at'] = datetime.now().isoformat()
+        analysis['model_used'] = AI_MODEL_NAME
+        analysis['status'] = 'completed'
+        return analysis
+    except Exception as e:
+        print(f"[AI] Error generating analysis: {e}")
+        return {'status': 'error', 'error': str(e), 'generated_at': datetime.now().isoformat()}
+
+
+def generate_ai_analysis_async(patient_id, patient):
+    """Generate AI analysis in background thread and store in database."""
+    try:
+        analysis = generate_ai_analysis(patient)
+        if analysis:
+            ai_analyses_collection.update_one(
+                {'patient_id': patient_id},
+                {'$set': {'patient_id': patient_id, 'analysis': analysis, 'updated_at': datetime.now()}},
+                upsert=True
+            )
+            print(f"[AI] Analysis stored for patient {patient_id}")
+    except Exception as e:
+        print(f"[AI] Background analysis error for {patient_id}: {e}")
+
+
+@app.route('/api/ai-analysis/<patient_id>', methods=['GET'])
+def get_ai_analysis(patient_id):
+    """Retrieve existing AI analysis for a patient."""
+    analysis_doc = ai_analyses_collection.find_one({'patient_id': patient_id})
+    if not analysis_doc:
+        return jsonify({'status': 'not_found', 'analysis': None})
     return jsonify({
-        'spike_detected': spike_detected,
-        'breathing_symptoms_count': breathing_count,
-        'total_triages_last_hour': total_triages,
-        'category_counts': category_counts,
-        'alert_level': 'critical' if spike_detected else 'normal',
-        'recommended_actions': [
-            'Isolate patients with respiratory symptoms' if spike_detected else None,
-            'Alert epidemiology team' if spike_detected else None,
-            'Prepare additional ventilators' if spike_detected and breathing_count > 5 else None,
-            'Activate pandemic protocols' if spike_detected else None
-        ]
+        'status': 'found',
+        'analysis': analysis_doc.get('analysis'),
+        'updated_at': analysis_doc.get('updated_at').isoformat() if analysis_doc.get('updated_at') else None
     })
 
-@app.route('/api/condition-x-simulate', methods=['POST'])
-def simulate_condition_x():
-    for i in range(5):
-        patient = {
-            'name': f'Simulated Patient {i+1}',
-            'phone': f'555000{i}',
-            'symptoms': ['trouble breathing', 'cough', 'fever'],
-            'duration': '2 days',
-            'breathing_trouble': True,
-            'triage_category': 'critical' if i < 2 else 'emergency',
-            'status': 'waiting',
-            'check_in_time': datetime.now(),
-            'assigned_bed': None,
-            'assigned_staff': None
-        }
-        patients_collection.insert_one(patient)
-    
-    return jsonify({'success': True, 'message': 'Simulated Condition X spike triggered'})
+
+@app.route('/api/ai-analysis/<patient_id>/generate', methods=['POST'])
+def trigger_ai_analysis(patient_id):
+    """Trigger AI analysis generation for a patient (synchronous)."""
+    if not ai_client:
+        return jsonify({'success': False, 'error': 'AI features are not configured. Please set your API key in the .env file.'}), 503
+    patient = patients_collection.find_one({'_id': ObjectId(patient_id)})
+    if not patient:
+        return jsonify({'success': False, 'error': 'Patient not found'}), 404
+    analysis = generate_ai_analysis(patient)
+    if analysis and analysis.get('status') != 'error':
+        ai_analyses_collection.update_one(
+            {'patient_id': patient_id},
+            {'$set': {'patient_id': patient_id, 'analysis': analysis, 'updated_at': datetime.now()}},
+            upsert=True
+        )
+        return jsonify({'success': True, 'analysis': analysis})
+    else:
+        error_msg = analysis.get('error', 'Unknown error') if analysis else 'AI service unavailable'
+        return jsonify({'success': False, 'error': error_msg}), 500
+
+
+@app.route('/api/ai-chat', methods=['POST'])
+def ai_chat():
+    """Chat with AI about a specific patient or general medical questions."""
+    if not ai_client:
+        return jsonify({'success': False, 'error': 'AI features are not configured. Please set your API key in the .env file.'}), 503
+    data = request.json
+    message = data.get('message', '')
+    patient_id = data.get('patient_id')
+    conversation_history = data.get('history', [])
+    if not message.strip():
+        return jsonify({'success': False, 'error': 'Message is required'}), 400
+
+    system_prompt = """You are TriageFlow AI, an expert medical assistant in a hospital triage system.
+You help medical staff with clinical questions and patient assessments.
+Guidelines:
+- Be concise and clinically relevant
+- Remind staff your suggestions are decision-support, not replacements for clinical judgment
+- Use medical terminology since your audience is medical professionals
+- Prioritize patient safety in all recommendations
+- Keep responses focused and actionable"""
+
+    messages = [{"role": "system", "content": system_prompt}]
+    if patient_id:
+        try:
+            patient = patients_collection.find_one({'_id': ObjectId(patient_id)})
+            if patient:
+                ctx = f"Patient: {patient.get('name','?')}, Age: {patient.get('age','?')}, Gender: {patient.get('gender','?')}, Symptoms: {', '.join(patient.get('symptoms',[]))}, Duration: {patient.get('duration','?')}, Breathing: {patient.get('breathing_trouble',False)}, Triage: {patient.get('triage_category','?')}, Meds: {patient.get('medications','None')}"
+                messages.append({"role": "system", "content": f"Patient Context: {ctx}"})
+        except Exception:
+            pass
+    for entry in conversation_history[-10:]:
+        messages.append({"role": entry.get('role', 'user'), "content": entry.get('content', '')})
+    messages.append({"role": "user", "content": message})
+    try:
+        response = ai_client.chat.completions.create(
+            model=AI_MODEL_NAME, messages=messages, temperature=0.4, max_tokens=1000
+        )
+        return jsonify({'success': True, 'reply': response.choices[0].message.content, 'model': AI_MODEL_NAME})
+    except Exception as e:
+        print(f"[AI] Chat error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/ai-status')
+def ai_status():
+    """Check if AI features are available."""
+    return jsonify({
+        'enabled': ai_client is not None,
+        'provider': Config.AI_PROVIDER,
+        'model': AI_MODEL_NAME if ai_client else None
+    })
+
 
 @app.route('/api/stats')
 def get_stats():
@@ -940,14 +1104,14 @@ def get_stats():
     waiting = patients_collection.count_documents({'status': 'waiting'})
     admitted = patients_collection.count_documents({'status': 'admitted'})
     discharged = patients_collection.count_documents({'status': 'discharged'})
-    
+
     available_beds = beds_collection.count_documents({'status': 'available'})
     occupied_beds = beds_collection.count_documents({'status': 'occupied'})
     cleaning_beds = beds_collection.count_documents({'status': 'cleaning'})
-    
+
     available_staff = staff_collection.count_documents({'status': 'available'})
     busy_staff = staff_collection.count_documents({'status': 'busy'})
-    
+
     return jsonify({
         'patients': {
             'total': total_patients,

@@ -40,7 +40,7 @@
                 {% endif %}
                 <a href="/waiting-room" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users-viewfinder mr-2"></i>Waiting Room</a>
                 <a href="/staff" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-users mr-2"></i>Staff</a>
-                <a href="/condition-x" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-virus mr-2"></i>Condition X</a>
+
                 {% if user_role == 'Admin' %}
                 <a href="/settings" class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium"><i class="fa-solid fa-cog mr-2"></i>Settings</a>
                 {% endif %}
@@ -108,6 +108,71 @@
                     <div class="max-h-[200px] overflow-y-auto" id="staffList">
                         <div class="text-center py-4 text-gray-500 text-sm">Loading staff...</div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Insights Modal -->
+    <div class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 overflow-y-auto py-8" id="aiInsightsModal">
+        <div class="bg-white rounded-xl w-full max-w-3xl mx-4 shadow-xl">
+            <div class="p-5 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white rounded-t-xl">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                        <i class="fa-solid fa-brain text-purple-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold">AI Clinical Insights</h3>
+                    <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">AI-Powered</span>
+                </div>
+                <button class="text-gray-400 hover:text-gray-600 text-2xl" onclick="closeAIModal()">&times;</button>
+            </div>
+            <div class="p-5 max-h-[70vh] overflow-y-auto" id="aiInsightsContent">
+                <div class="text-center py-8">
+                    <i class="fa-solid fa-spinner fa-spin text-3xl text-purple-500 mb-3"></i>
+                    <p class="text-gray-500">Loading AI analysis...</p>
+                </div>
+            </div>
+            <div class="p-5 border-t border-gray-200">
+                <div class="flex items-center gap-2">
+                    <input type="text" id="aiChatInput" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none text-sm" placeholder="Ask AI about this patient..." onkeypress="if(event.key==='Enter')sendAIChat()">
+                    <button onclick="sendAIChat()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm">
+                        <i class="fa-solid fa-paper-plane mr-1"></i>Ask
+                    </button>
+                </div>
+                <div id="aiChatHistory" class="mt-3 space-y-2 max-h-48 overflow-y-auto hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Chat Floating Button -->
+    <button onclick="openGlobalAIChat()" class="fixed bottom-6 right-6 w-14 h-14 bg-purple-600 text-white rounded-full shadow-lg hover:bg-purple-700 flex items-center justify-center text-xl z-40" title="AI Medical Assistant">
+        <i class="fa-solid fa-robot"></i>
+    </button>
+
+    <!-- Global AI Chat Modal -->
+    <div class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50" id="globalAIChatModal">
+        <div class="bg-white rounded-xl w-full max-w-lg mx-4 shadow-xl flex flex-col" style="max-height:80vh">
+            <div class="p-5 border-b border-gray-200 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                        <i class="fa-solid fa-robot text-purple-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold">AI Medical Assistant</h3>
+                </div>
+                <button class="text-gray-400 hover:text-gray-600 text-2xl" onclick="closeGlobalAIChat()">&times;</button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-3" id="globalChatMessages">
+                <div class="flex gap-2">
+                    <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-robot text-purple-600 text-sm"></i></div>
+                    <div class="bg-gray-100 rounded-lg p-3 text-sm max-w-[80%]">
+                        <p>Hello! I'm TriageFlow AI. Ask me anything about patient care, triage protocols, or clinical questions.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 border-t border-gray-200">
+                <div class="flex gap-2">
+                    <input type="text" id="globalChatInput" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none text-sm" placeholder="Ask a medical question..." onkeypress="if(event.key==='Enter')sendGlobalChat()">
+                    <button onclick="sendGlobalChat()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm"><i class="fa-solid fa-paper-plane"></i></button>
                 </div>
             </div>
         </div>

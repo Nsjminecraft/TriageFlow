@@ -10,7 +10,6 @@ A comprehensive hospital triage and patient management system built with Flask, 
 - Patient triage with 4 priority categories (Simple, Attention, Emergency, Critical)
 - Staff management (Doctors and Nurses)
 - Bed assignment and tracking
-- Condition X monitoring and alerts
 - Role-based access control
 
 **Tech Stack:**
@@ -147,7 +146,6 @@ All templates now conditionally show/hide Settings based on role:
 - all_patients.html
 - my_patients.html
 - staff.html
-- condition_x.html
 - settings.html
 - bed_qr.html
 - patient_intake.html
@@ -164,12 +162,12 @@ Standardized all pages to have the same navbar:
 
 **Doctor/Nurse View:**
 ```
-[Dashboard] [My Patients] [Staff] [Condition X] [Bed QR] [All Patients] [Logout]
+[Dashboard] [My Patients] [Staff] [Bed QR] [All Patients] [Logout]
 ```
 
 **Admin View:**
 ```
-[Dashboard] [My Patients] [Staff] [Condition X] [Settings] [Bed QR] [All Patients] [Logout]
+[Dashboard] [My Patients] [Staff] [Settings] [Bed QR] [All Patients] [Logout]
 ```
 
 **Removed:**
@@ -330,7 +328,6 @@ Then open: **http://127.0.0.1:5000**
 | My Patients | /my-patients | Doctor/Nurse |
 | All Patients | /all-patients | Logged in |
 | Staff | /staff | Logged in |
-| Condition X | /condition-x | Logged in |
 | Settings | /settings | Admin only |
 | Bed QR | /bed-qr | Logged in |
 
@@ -357,7 +354,6 @@ Then open: **http://127.0.0.1:5000**
 | `my_patients.html` | Doctor/Nurse's assigned patients |
 | `all_patients.html` | All patients for today |
 | `staff.html` | Staff management |
-| `condition_x.html` | Condition X monitoring dashboard |
 | `settings.html` | Hospital configuration (admin) |
 | `bed_qr.html` | Bed QR code scanning |
 | `login-qr.html` | QR code for login URL |
@@ -432,8 +428,7 @@ Then open: **http://127.0.0.1:5000**
 
 ## Next Steps / Improvements Needed
 
-1. Condition X 24/7 monitoring with background scheduler
-2. Patient discharge functionality for doctors
+1. Patient discharge functionality for doctors
 3. Proper session timeout handling
 4. Add more validation on forms
 5. Mobile-responsive improvements

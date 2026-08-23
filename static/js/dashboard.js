@@ -73,6 +73,9 @@ function renderPatients(patients) {
                 <button class="flex-1 px-2 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700" onclick="openAssignModal('${p._id}')">
                     <i class="fa-solid fa-bed mr-1"></i> Assign
                 </button>
+                <button class="px-2 py-1.5 bg-purple-600 text-white rounded-lg text-xs hover:bg-purple-700" onclick="openAIInsights('${p._id}', '${(p.name || 'Patient').replace(/'/g, "\\'")}')" title="AI Insights">
+                    <i class="fa-solid fa-brain"></i>
+                </button>
                 ${p.status === 'admitted' ? `<button class="flex-1 px-2 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700" onclick="dischargePatient('${p._id}')"><i class="fa-solid fa-check"></i></button>` : ''}
             </div>
         </div>
@@ -488,6 +491,147 @@ loadStats();
 loadPatients();
 loadBeds();
 loadStaff();
+
+// ===== AI FEATURES =====
+let currentAIPatientId = null;
+let aiChatConversationHistory = [];
+let globalChatHistory = [];
+
+async function openAIInsights(patientId, patientName) {
+    currentAIPatientId = patientId;
+    aiChatConversationHistory = [];
+    const modal = document.getElementById('aiInsightsModal');
+    const content = document.getElementById('aiInsightsContent');
+    const chatHistory = document.getElementById('aiChatHistory');
+    chatHistory.classList.add('hidden');
+    chatHistory.innerHTML = '';
+    document.getElementById('aiChatInput').value = '';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    content.innerHTML = '<div class="text-center py-8"><i class="fa-solid fa-spinner fa-spin text-3xl text-purple-500 mb-3"></i><p class="text-gray-500">Loading AI analysis...</p></div>';
+    try {
+        let res = await fetch('/api/ai-analysis/' + patientId);
+        let data = await res.json();
+        if (data.status === 'found' && data.analysis && data.analysis.status === 'completed') {
+            renderDashboardAIAnalysis(data.analysis, patientName);
+            return;
+        }
+    } catch(e) {}
+    content.innerHTML = '<div class="text-center py-8"><i class="fa-solid fa-brain text-3xl text-purple-500 mb-3 animate-pulse"></i><p class="text-gray-500 font-medium">AI is analyzing ' + patientName + '...</p><p class="text-gray-400 text-sm mt-1">This may take 10-15 seconds</p></div>';
+    try {
+        let res = await fetch('/api/ai-analysis/' + patientId + '/generate', { method: 'POST' });
+        let data = await res.json();
+        if (data.success && data.analysis) {
+            renderDashboardAIAnalysis(data.analysis, patientName);
+        } else {
+            content.innerHTML = '<div class="text-center py-8"><i class="fa-solid fa-triangle-exclamation text-3xl text-amber-500 mb-3"></i><p class="text-gray-600 font-medium">' + (data.error || 'AI analysis unavailable') + '</p><p class="text-gray-400 text-sm mt-2">Set OPENAI_API_KEY in .env file</p></div>';
+        }
+    } catch(e) {
+        content.innerHTML = '<div class="text-center py-8"><i class="fa-solid fa-triangle-exclamation text-3xl text-red-500 mb-3"></i><p class="text-red-600">Error loading AI analysis</p></div>';
+    }
+}
+
+function renderDashboardAIAnalysis(analysis, patientName) {
+    const catColors = {simple:'bg-green-100 text-green-700 border-green-200',attention:'bg-yellow-100 text-yellow-700 border-yellow-200',emergency:'bg-orange-100 text-orange-700 border-orange-200',critical:'bg-red-100 text-red-700 border-red-200'};
+    const catColor = catColors[analysis.recommended_category] || 'bg-gray-100 text-gray-700 border-gray-200';
+    const confColor = analysis.confidence === 'high' ? 'text-green-600' : analysis.confidence === 'medium' ? 'text-yellow-600' : 'text-gray-500';
+    let html = '<p class="text-sm text-gray-500 mb-4">AI clinical analysis for <strong>' + (patientName || 'Patient') + '</strong></p>';
+    html += '<div class="border rounded-lg p-4 mb-4 ' + catColor + '"><div class="flex items-center justify-between mb-2"><span class="font-bold"><i class="fa-solid fa-stethoscope mr-1"></i>AI Recommended: ' + (analysis.recommended_category || '').toUpperCase() + '</span><span class="text-sm ' + confColor + ' font-medium">Confidence: ' + (analysis.confidence || '') + '</span></div><p class="text-sm">' + (analysis.reasoning || '') + '</p></div>';
+    if (analysis.clinical_summary) { html += '<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4"><p class="font-semibold text-blue-800 mb-1"><i class="fa-solid fa-notes-medical mr-1"></i>Clinical Summary</p><p class="text-sm text-blue-700">' + analysis.clinical_summary + '</p></div>'; }
+    if (analysis.possible_conditions && analysis.possible_conditions.length > 0) {
+        html += '<div class="mb-4"><p class="font-semibold text-gray-800 mb-2"><i class="fa-solid fa-magnifying-glass mr-1"></i>Possible Conditions</p><div class="space-y-2">';
+        analysis.possible_conditions.forEach(function(c) { var lk = c.likelihood === 'high' ? 'bg-red-100 text-red-700' : c.likelihood === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'; html += '<div class="flex items-center gap-2 text-sm bg-white rounded-lg p-2 border"><span class="px-2 py-0.5 rounded text-xs font-medium ' + lk + '">' + c.likelihood + '</span><span class="font-medium">' + c.name + '</span><span class="text-gray-400 ml-auto text-xs">' + (c.notes || '') + '</span></div>'; });
+        html += '</div></div>';
+    }
+    if (analysis.suggested_tests && analysis.suggested_tests.length > 0) {
+        html += '<div class="mb-4"><p class="font-semibold text-gray-800 mb-2"><i class="fa-solid fa-vial mr-1"></i>Suggested Tests</p><div class="space-y-1">';
+        analysis.suggested_tests.forEach(function(t) { var pr = t.priority === 'urgent' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'; html += '<div class="flex items-center gap-2 text-sm"><span class="px-2 py-0.5 rounded text-xs font-medium ' + pr + '">' + t.priority + '</span><span class="font-medium">' + t.name + '</span><span class="text-gray-400 text-xs">- ' + (t.reason || '') + '</span></div>'; });
+        html += '</div></div>';
+    }
+    if (analysis.risk_factors && analysis.risk_factors.length > 0) {
+        html += '<div class="mb-4"><p class="font-semibold text-gray-800 mb-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Risk Factors</p><div class="flex flex-wrap gap-2">';
+        analysis.risk_factors.forEach(function(r) { html += '<span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-medium">' + r + '</span>'; });
+        html += '</div></div>';
+    }
+    if (analysis.immediate_actions && analysis.immediate_actions.length > 0) {
+        html += '<div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4"><p class="font-semibold text-red-800 mb-2"><i class="fa-solid fa-bolt mr-1"></i>Immediate Actions</p><ul class="text-sm text-red-700 space-y-1">';
+        analysis.immediate_actions.forEach(function(a) { html += '<li>• ' + a + '</li>'; });
+        html += '</ul></div>';
+    }
+    if (analysis.patient_instructions) { html += '<div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4"><p class="font-semibold text-green-800 mb-1"><i class="fa-solid fa-circle-info mr-1"></i>Patient Instructions</p><p class="text-sm text-green-700">' + analysis.patient_instructions + '</p></div>'; }
+    if (analysis.red_flags && analysis.red_flags.length > 0) {
+        html += '<div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4"><p class="font-semibold text-amber-800 mb-2"><i class="fa-solid fa-flag mr-1"></i>Watch For</p><ul class="text-sm text-amber-700 space-y-1">';
+        analysis.red_flags.forEach(function(r) { html += '<li>⚠️ ' + r + '</li>'; });
+        html += '</ul></div>';
+    }
+    var modelLabel = analysis.model_used ? 'Powered by ' + analysis.model_used : 'AI-generated';
+    html += '<p class="text-xs text-gray-400 text-center mt-4"><i class="fa-solid fa-robot mr-1"></i>' + modelLabel + ' clinical decision support • For medical staff reference only</p>';
+    document.getElementById('aiInsightsContent').innerHTML = html;
+}
+
+function closeAIModal() {
+    document.getElementById('aiInsightsModal').classList.add('hidden');
+    document.getElementById('aiInsightsModal').classList.remove('flex');
+}
+
+async function sendAIChat() {
+    const input = document.getElementById('aiChatInput');
+    const message = input.value.trim();
+    if (!message) return;
+    input.value = '';
+    const chatHistory = document.getElementById('aiChatHistory');
+    chatHistory.classList.remove('hidden');
+    chatHistory.innerHTML += '<div class="flex justify-end"><div class="bg-purple-600 text-white rounded-lg px-3 py-2 text-sm max-w-[80%]">' + message.replace(/</g,'&lt;') + '</div></div>';
+    chatHistory.innerHTML += '<div class="flex gap-2" id="aiChatLoading"><div class="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-robot text-purple-600 text-xs"></i></div><div class="bg-gray-100 rounded-lg px-3 py-2 text-sm"><i class="fa-solid fa-spinner fa-spin"></i> Thinking...</div></div>';
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+    aiChatConversationHistory.push({ role: 'user', content: message });
+    try {
+        const res = await fetch('/api/ai-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: message, patient_id: currentAIPatientId, history: aiChatConversationHistory.slice(0, -1) }) });
+        const data = await res.json();
+        const loading = document.getElementById('aiChatLoading');
+        if (loading) loading.remove();
+        if (data.success) {
+            aiChatConversationHistory.push({ role: 'assistant', content: data.reply });
+            const escaped = data.reply.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+            chatHistory.innerHTML += '<div class="flex gap-2"><div class="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-robot text-purple-600 text-xs"></i></div><div class="bg-gray-100 rounded-lg px-3 py-2 text-sm max-w-[80%]">' + escaped + '</div></div>';
+        } else { chatHistory.innerHTML += '<div class="text-red-500 text-xs">Error: ' + (data.error || 'Unknown') + '</div>'; }
+    } catch(e) { const loading = document.getElementById('aiChatLoading'); if (loading) loading.remove(); chatHistory.innerHTML += '<div class="text-red-500 text-xs">Network error</div>'; }
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+function openGlobalAIChat() {
+    document.getElementById('globalAIChatModal').classList.remove('hidden');
+    document.getElementById('globalAIChatModal').classList.add('flex');
+    document.getElementById('globalChatInput').focus();
+}
+function closeGlobalAIChat() {
+    document.getElementById('globalAIChatModal').classList.add('hidden');
+    document.getElementById('globalAIChatModal').classList.remove('flex');
+}
+
+async function sendGlobalChat() {
+    const input = document.getElementById('globalChatInput');
+    const message = input.value.trim();
+    if (!message) return;
+    input.value = '';
+    const messages = document.getElementById('globalChatMessages');
+    messages.innerHTML += '<div class="flex justify-end gap-2"><div class="bg-purple-600 text-white rounded-lg p-3 text-sm max-w-[80%]">' + message.replace(/</g,'&lt;') + '</div></div>';
+    messages.innerHTML += '<div class="flex gap-2" id="globalChatLoading"><div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-robot text-purple-600 text-sm"></i></div><div class="bg-gray-100 rounded-lg p-3 text-sm"><i class="fa-solid fa-spinner fa-spin"></i> Thinking...</div></div>';
+    messages.scrollTop = messages.scrollHeight;
+    globalChatHistory.push({ role: 'user', content: message });
+    try {
+        const res = await fetch('/api/ai-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: message, history: globalChatHistory.slice(0, -1) }) });
+        const data = await res.json();
+        const loading = document.getElementById('globalChatLoading');
+        if (loading) loading.remove();
+        if (data.success) {
+            globalChatHistory.push({ role: 'assistant', content: data.reply });
+            const escaped = data.reply.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+            messages.innerHTML += '<div class="flex gap-2"><div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-robot text-purple-600 text-sm"></i></div><div class="bg-gray-100 rounded-lg p-3 text-sm max-w-[80%]">' + escaped + '</div></div>';
+        } else { messages.innerHTML += '<div class="text-red-500 text-sm">Error: ' + (data.error || 'Unknown') + '</div>'; }
+    } catch(e) { const loading = document.getElementById('globalChatLoading'); if (loading) loading.remove(); messages.innerHTML += '<div class="text-red-500 text-sm">Network error</div>'; }
+    messages.scrollTop = messages.scrollHeight;
+}
 
 setInterval(() => {
     loadStats();

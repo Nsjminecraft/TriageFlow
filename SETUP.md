@@ -65,7 +65,6 @@ triageflow/
     ├── my_patients.html
     ├── all_patients.html
     ├── staff.html
-    ├── condition_x.html
     ├── settings.html
     ├── bed_qr.html
     └── login-qr.html
@@ -130,7 +129,6 @@ Creates 5 doctors (DTS001-005) and 5 nurses (NRS001-005) on first run.
 - `/my-patients` - Doctor/Nurse's patients
 - `/all-patients` - All patients
 - `/staff` - Staff management
-- `/condition-x` - Condition monitoring
 - `/settings` - Admin only
 - `/bed-qr` - Bed QR codes
 - `/login-qr` - QR code for login URL
