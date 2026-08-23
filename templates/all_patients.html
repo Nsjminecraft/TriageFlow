@@ -54,6 +54,48 @@
         </div>
     </div>
 
+    <!-- Edit Patient Modal -->
+    <div class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50" id="editPatientModal">
+        <div class="bg-white rounded-xl w-full max-w-lg mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div class="p-5 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+                <h3 class="text-lg font-semibold"><i class="fa-solid fa-user-pen mr-2 text-blue-600"></i>Edit Patient</h3>
+                <button class="text-gray-400 hover:text-gray-600 text-2xl" onclick="closeEditModal()">&times;</button>
+            </div>
+            <div class="p-5 space-y-4">
+                <input type="hidden" id="editPatientId">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Name</label><input type="text" id="editName" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="text" id="editPhone" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Age</label><input type="number" id="editAge" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Gender</label><select id="editGender" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Duration</label><input type="text" id="editDuration" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="e.g. 2 days"></div>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Status</label><select id="editStatus" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"><option value="waiting">Waiting</option><option value="admitted">Admitted</option><option value="discharged">Discharged</option></select></div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Triage</label><select id="editTriage" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"><option value="simple">Simple</option><option value="attention">Attention</option><option value="emergency">Emergency</option><option value="critical">Critical</option></select></div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Symptoms</label>
+                    <div id="editSymptomsList" class="flex flex-wrap gap-2 mb-2"></div>
+                    <div class="flex gap-2"><input type="text" id="editNewSymptom" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Add symptom..." onkeypress="if(event.key==='Enter'){event.preventDefault();addEditSymptom()}"><button type="button" onclick="addEditSymptom()" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"><i class="fa-solid fa-plus"></i></button></div>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Medications</label><input type="text" id="editMedications" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="editBreathingTrouble" class="rounded border-gray-300 text-blue-600"> Breathing trouble</label>
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="editFamilyHistory" class="rounded border-gray-300 text-blue-600"> Family history</label>
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="editSubstanceUse" class="rounded border-gray-300 text-blue-600"> Substance use</label>
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="editSexuallyActive" class="rounded border-gray-300 text-blue-600"> Sexually active</label>
+                </div>
+                <div><label class="block text-sm font-medium text-gray-700 mb-1">Notes</label><textarea id="editNotes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea></div>
+                <div id="editFeedback" class="text-center text-sm hidden py-2 rounded-lg"></div>
+            </div>
+            <div class="p-5 border-t border-gray-200 flex justify-end gap-2 sticky bottom-0 bg-white">
+                <button class="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 font-medium" onclick="closeEditModal()">Cancel</button>
+                <button class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium" onclick="savePatientEdit()"><i class="fa-solid fa-save mr-2"></i>Save</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let allPatients = [];
         let staffData = [];
@@ -207,6 +249,10 @@
                         </div>
                     </div>
                     ` : ''}
+                    
+                    <div class="border-t border-gray-100 pt-3 mt-3 flex gap-2">
+                        <button onclick="openEditModal('${p._id}')" class="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700"><i class="fa-solid fa-pen mr-1"></i> Edit Patient</button>
+                    </div>
                 </div>
             `).join('');
         }
@@ -216,6 +262,69 @@
                 filterPatients(this.dataset.filter);
             });
         });
+
+        // ========== Edit Patient Functions ==========
+        let editSymptoms = [];
+        async function openEditModal(patientId) {
+            try {
+                const res = await fetch(`/api/patients/${patientId}`);
+                const p = await res.json();
+                if (!p || p.error) { alert('Patient not found'); return; }
+                document.getElementById('editPatientId').value = patientId;
+                document.getElementById('editName').value = p.name || '';
+                document.getElementById('editPhone').value = p.phone || '';
+                document.getElementById('editAge').value = p.age || '';
+                document.getElementById('editGender').value = p.gender || 'male';
+                document.getElementById('editDuration').value = p.duration || '';
+                document.getElementById('editStatus').value = p.status || 'waiting';
+                document.getElementById('editTriage').value = p.triage_category || 'simple';
+                document.getElementById('editMedications').value = p.medications || '';
+                document.getElementById('editBreathingTrouble').checked = !!p.breathing_trouble;
+                document.getElementById('editFamilyHistory').checked = !!p.family_history;
+                document.getElementById('editSubstanceUse').checked = !!p.substance_use;
+                document.getElementById('editSexuallyActive').checked = !!p.sexually_active;
+                document.getElementById('editNotes').value = p.notes || '';
+                editSymptoms = Array.isArray(p.symptoms) ? [...p.symptoms] : [];
+                renderEditSymptoms();
+                document.getElementById('editFeedback').classList.add('hidden');
+                document.getElementById('editPatientModal').classList.remove('hidden');
+                document.getElementById('editPatientModal').classList.add('flex');
+            } catch (e) { alert('Error loading patient data'); }
+        }
+        function renderEditSymptoms() {
+            const c = document.getElementById('editSymptomsList');
+            if (editSymptoms.length === 0) { c.innerHTML = '<span class="text-gray-400 text-xs">No symptoms added</span>'; return; }
+            c.innerHTML = editSymptoms.map((s, i) => `<span class="inline-flex items-center gap-1 bg-red-50 text-red-700 px-2 py-1 rounded-full text-xs">${s}<button onclick="removeEditSymptom(${i})" class="text-red-400 hover:text-red-600"><i class="fa-solid fa-xmark"></i></button></span>`).join('');
+        }
+        function addEditSymptom() { const input = document.getElementById('editNewSymptom'); const s = input.value.trim(); if (!s) return; if (editSymptoms.includes(s)) { input.value = ''; return; } editSymptoms.push(s); input.value = ''; renderEditSymptoms(); }
+        function removeEditSymptom(i) { editSymptoms.splice(i, 1); renderEditSymptoms(); }
+        function closeEditModal() { document.getElementById('editPatientModal').classList.add('hidden'); document.getElementById('editPatientModal').classList.remove('flex'); editSymptoms = []; }
+        async function savePatientEdit() {
+            const patientId = document.getElementById('editPatientId').value;
+            if (!patientId) return;
+            const feedback = document.getElementById('editFeedback');
+            const payload = {
+                name: document.getElementById('editName').value.trim(), phone: document.getElementById('editPhone').value.trim(),
+                age: parseInt(document.getElementById('editAge').value) || null, gender: document.getElementById('editGender').value,
+                duration: document.getElementById('editDuration').value.trim(), status: document.getElementById('editStatus').value,
+                triage_category: document.getElementById('editTriage').value, symptoms: editSymptoms,
+                medications: document.getElementById('editMedications').value.trim(),
+                breathing_trouble: document.getElementById('editBreathingTrouble').checked,
+                family_history: document.getElementById('editFamilyHistory').checked,
+                substance_use: document.getElementById('editSubstanceUse').checked,
+                sexually_active: document.getElementById('editSexuallyActive').checked,
+                notes: document.getElementById('editNotes').value.trim()
+            };
+            feedback.classList.add('hidden');
+            try {
+                const res = await fetch(`/api/patients/${patientId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const data = await res.json();
+                if (data.success) {
+                    feedback.textContent = 'Updated!'; feedback.className = 'text-center text-sm py-2 rounded-lg bg-green-100 text-green-700'; feedback.classList.remove('hidden');
+                    setTimeout(() => { closeEditModal(); loadPatients(); }, 800);
+                } else { feedback.textContent = 'Error: ' + (data.error || 'Unknown'); feedback.className = 'text-center text-sm py-2 rounded-lg bg-red-100 text-red-700'; feedback.classList.remove('hidden'); }
+            } catch (e) { feedback.textContent = 'Network error'; feedback.className = 'text-center text-sm py-2 rounded-lg bg-red-100 text-red-700'; feedback.classList.remove('hidden'); }
+        }
 
         loadPatients();
         setInterval(loadPatients, 15000);

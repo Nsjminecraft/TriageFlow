@@ -3,6 +3,28 @@ let selectedPatient = null;
 let selectedBed = null;
 let selectedStaff = null;
 
+// ---- Client-side bed cache ----
+let _bedsCache = null;
+let _bedsCacheTs = 0;
+const BEDS_CACHE_TTL_MS = 15000; // 15 seconds
+
+function invalidateBedsCache() {
+    _bedsCache = null;
+    _bedsCacheTs = 0;
+}
+
+async function getBeds(forceRefresh = false) {
+    const now = Date.now();
+    if (!forceRefresh && _bedsCache && (now - _bedsCacheTs) < BEDS_CACHE_TTL_MS) {
+        return _bedsCache;
+    }
+    const response = await fetch('/api/beds');
+    if (!response.ok) throw new Error('Beds failed');
+    _bedsCache = await response.json();
+    _bedsCacheTs = Date.now();
+    return _bedsCache;
+}
+
 async function loadStats() {
     try {
         const response = await fetch('/api/stats');
@@ -73,6 +95,7 @@ function renderPatients(patients) {
                 <button class="flex-1 px-2 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700" onclick="openAssignModal('${p._id}')">
                     <i class="fa-solid fa-bed mr-1"></i> Assign
                 </button>
+                <button class="px-2 py-1.5 bg-gray-600 text-white rounded-lg text-xs hover:bg-gray-700" onclick="openEditModal('${p._id}')" title="Edit Patient"><i class="fa-solid fa-pen"></i></button>
                 <button class="px-2 py-1.5 bg-purple-600 text-white rounded-lg text-xs hover:bg-purple-700" onclick="openAIInsights('${p._id}', '${(p.name || 'Patient').replace(/'/g, "\\'")}')" title="AI Insights">
                     <i class="fa-solid fa-brain"></i>
                 </button>
@@ -108,11 +131,9 @@ function formatTime(isoString) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-async function loadBeds() {
+async function loadBeds(forceRefresh = false) {
     try {
-        const response = await fetch('/api/beds');
-        if (!response.ok) throw new Error('Beds failed');
-        const beds = await response.json();
+        const beds = await getBeds(forceRefresh);
         renderBeds(beds);
     } catch (error) {
         console.error('Error loading beds:', error);
@@ -164,8 +185,7 @@ function getBedClass(status) {
 
 async function showBedPatient(bedId, bedNumber) {
     try {
-        const response = await fetch('/api/beds');
-        const beds = await response.json();
+        const beds = await getBeds();
         const bed = beds.find(b => b._id === bedId);
         
         if (!bed || !bed.patient_info) {
@@ -293,8 +313,7 @@ function openAssignModal(patientId) {
 
 async function loadManualBedSelection() {
     try {
-        const response = await fetch('/api/beds');
-        const beds = await response.json();
+        const beds = await getBeds();
         const available = beds.filter(b => b.status === 'available');
         
         const container = document.getElementById('manualBedSelection');
@@ -336,8 +355,7 @@ function closeModal() {
 
 async function loadAvailableBeds() {
     try {
-        const response = await fetch('/api/beds');
-        const beds = await response.json();
+        const beds = await getBeds();
         const available = beds.filter(b => b.status === 'available');
         
         const container = document.getElementById('bedSelection');
@@ -408,8 +426,9 @@ async function confirmAssignment() {
         await fetch(`/api/auto-assign/${selectedPatient}`, { method: 'POST' });
         
         closeModal();
+        invalidateBedsCache();
         loadPatients();
-        loadBeds();
+        loadBeds(true);
         loadStaff();
         loadStats();
     } catch (error) {
@@ -430,8 +449,7 @@ async function manualAssign() {
     }
     
     try {
-        const bedsRes = await fetch('/api/beds');
-        const beds = await bedsRes.json();
+        const beds = await getBeds(true); // force fresh after mutation
         const selectedBedData = beds.find(b => b._id === selectedBed);
         
         if (selectedBedData) {
@@ -445,8 +463,9 @@ async function manualAssign() {
         await fetch(`/api/auto-assign/${selectedPatient}`, { method: 'POST' });
         
         closeModal();
+        invalidateBedsCache();
         loadPatients();
-        loadBeds();
+        loadBeds(true);
         loadStaff();
         loadStats();
     } catch (error) {
@@ -465,8 +484,9 @@ async function dischargePatient(patientId) {
             body: JSON.stringify({ patient_id: patientId })
         });
         
+        invalidateBedsCache();
         loadPatients();
-        loadBeds();
+        loadBeds(true);
         loadStaff();
         loadStats();
     } catch (error) {
@@ -631,6 +651,140 @@ async function sendGlobalChat() {
         } else { messages.innerHTML += '<div class="text-red-500 text-sm">Error: ' + (data.error || 'Unknown') + '</div>'; }
     } catch(e) { const loading = document.getElementById('globalChatLoading'); if (loading) loading.remove(); messages.innerHTML += '<div class="text-red-500 text-sm">Network error</div>'; }
     messages.scrollTop = messages.scrollHeight;
+}
+
+// ========== Edit Patient Functions ==========
+let editSymptoms = [];
+
+async function openEditModal(patientId) {
+    try {
+        const res = await fetch(`/api/patients/${patientId}`);
+        const p = await res.json();
+        if (!p || p.error) { alert('Patient not found'); return; }
+        
+        document.getElementById('editPatientId').value = patientId;
+        document.getElementById('editName').value = p.name || '';
+        document.getElementById('editPhone').value = p.phone || '';
+        document.getElementById('editAge').value = p.age || '';
+        document.getElementById('editGender').value = p.gender || 'male';
+        document.getElementById('editDuration').value = p.duration || '';
+        document.getElementById('editStatus').value = p.status || 'waiting';
+        document.getElementById('editTriage').value = p.triage_category || 'simple';
+        document.getElementById('editMedications').value = p.medications || '';
+        document.getElementById('editBreathingTrouble').checked = !!p.breathing_trouble;
+        document.getElementById('editFamilyHistory').checked = !!p.family_history;
+        document.getElementById('editSubstanceUse').checked = !!p.substance_use;
+        document.getElementById('editSexuallyActive').checked = !!p.sexually_active;
+        document.getElementById('editNotes').value = p.notes || '';
+        
+        editSymptoms = Array.isArray(p.symptoms) ? [...p.symptoms] : [];
+        renderEditSymptoms();
+        
+        document.getElementById('editFeedback').classList.add('hidden');
+        document.getElementById('editPatientModal').classList.remove('hidden');
+        document.getElementById('editPatientModal').classList.add('flex');
+    } catch (e) {
+        console.error('Error loading patient:', e);
+        alert('Error loading patient data');
+    }
+}
+
+function renderEditSymptoms() {
+    const container = document.getElementById('editSymptomsList');
+    if (editSymptoms.length === 0) {
+        container.innerHTML = '<span class="text-gray-400 text-xs">No symptoms added</span>';
+        return;
+    }
+    container.innerHTML = editSymptoms.map((s, i) => 
+        `<span class="inline-flex items-center gap-1 bg-red-50 text-red-700 px-2 py-1 rounded-full text-xs">
+            ${s}
+            <button onclick="removeEditSymptom(${i})" class="text-red-400 hover:text-red-600"><i class="fa-solid fa-xmark"></i></button>
+        </span>`
+    ).join('');
+}
+
+function addEditSymptom() {
+    const input = document.getElementById('editNewSymptom');
+    const symptom = input.value.trim();
+    if (!symptom) return;
+    if (editSymptoms.includes(symptom)) { input.value = ''; return; }
+    editSymptoms.push(symptom);
+    input.value = '';
+    renderEditSymptoms();
+}
+
+function removeEditSymptom(index) {
+    editSymptoms.splice(index, 1);
+    renderEditSymptoms();
+}
+
+function closeEditModal() {
+    document.getElementById('editPatientModal').classList.add('hidden');
+    document.getElementById('editPatientModal').classList.remove('flex');
+    editSymptoms = [];
+}
+
+async function savePatientEdit() {
+    const patientId = document.getElementById('editPatientId').value;
+    if (!patientId) return;
+    
+    const feedback = document.getElementById('editFeedback');
+    const saveBtn = document.querySelector('#editPatientModal button[onclick="savePatientEdit()"]');
+    
+    const payload = {
+        name: document.getElementById('editName').value.trim(),
+        phone: document.getElementById('editPhone').value.trim(),
+        age: parseInt(document.getElementById('editAge').value) || null,
+        gender: document.getElementById('editGender').value,
+        duration: document.getElementById('editDuration').value.trim(),
+        status: document.getElementById('editStatus').value,
+        triage_category: document.getElementById('editTriage').value,
+        symptoms: editSymptoms,
+        medications: document.getElementById('editMedications').value.trim(),
+        breathing_trouble: document.getElementById('editBreathingTrouble').checked,
+        family_history: document.getElementById('editFamilyHistory').checked,
+        substance_use: document.getElementById('editSubstanceUse').checked,
+        sexually_active: document.getElementById('editSexuallyActive').checked,
+        notes: document.getElementById('editNotes').value.trim()
+    };
+    
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Saving...';
+    feedback.classList.add('hidden');
+    
+    try {
+        const res = await fetch(`/api/patients/${patientId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            feedback.textContent = 'Patient updated successfully!';
+            feedback.className = 'text-center text-sm py-2 rounded-lg bg-green-100 text-green-700';
+            feedback.classList.remove('hidden');
+            setTimeout(() => {
+                closeEditModal();
+                invalidateBedsCache();
+                loadPatients();
+                loadBeds(true);
+                loadStaff();
+                loadStats();
+            }, 800);
+        } else {
+            feedback.textContent = 'Error: ' + (data.error || 'Unknown error');
+            feedback.className = 'text-center text-sm py-2 rounded-lg bg-red-100 text-red-700';
+            feedback.classList.remove('hidden');
+        }
+    } catch (e) {
+        feedback.textContent = 'Network error. Please try again.';
+        feedback.className = 'text-center text-sm py-2 rounded-lg bg-red-100 text-red-700';
+        feedback.classList.remove('hidden');
+    }
+    
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '<i class="fa-solid fa-save mr-2"></i>Save';
 }
 
 setInterval(() => {

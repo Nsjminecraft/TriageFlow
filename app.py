@@ -5,6 +5,8 @@ from bson import ObjectId
 from datetime import datetime, timedelta
 import json
 import random
+import threading
+import time
 from config import Config
 import os
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -20,6 +22,173 @@ patients_collection = db['patients']
 beds_collection = db['beds']
 staff_collection = db['staff']
 triage_logs_collection = db['triage_logs']
+ai_analyses_collection = db['ai_analyses']
+
+# --------------- Bed cache ---------------
+# In-memory cache so /api/beds doesn't hit Mongo on every call.
+# Any route that mutates beds/patients/staff calls invalidate_beds_cache().
+_beds_cache = {'data': None, 'ts': 0}
+_beds_cache_lock = threading.Lock()
+BEDS_CACHE_TTL = 15  # seconds
+
+def invalidate_beds_cache():
+    """Call this after any DB write that affects beds, patients, or staff."""
+    with _beds_cache_lock:
+        _beds_cache['data'] = None
+        _beds_cache['ts'] = 0
+
+def _build_beds_payload():
+    """Fetch beds with enriched patient/staff info using batch lookups."""
+    beds = list(beds_collection.find())
+    if not beds:
+        return beds
+
+    # Serialize ObjectIds and datetimes
+    for b in beds:
+        b['_id'] = str(b['_id'])
+        b['last_updated'] = b['last_updated'].isoformat() if b.get('last_updated') else None
+
+    # Batch-collect all patient IDs we need to look up
+    patient_ids = set()
+    for b in beds:
+        pid = b.get('patient_id')
+        if pid:
+            patient_ids.add(pid)
+
+    # Also find admitted patients by assigned_bed (fallback link)
+    admitted = list(patients_collection.find({'status': 'admitted'}))
+    admitted_by_bed_num = {}
+    admitted_by_id = {}
+    for p in admitted:
+        p['_id'] = str(p['_id'])
+        p['check_in_time'] = p['check_in_time'].isoformat() if p.get('check_in_time') else None
+        patient_ids.add(p['_id'])
+        if p.get('assigned_bed'):
+            admitted_by_bed_num[str(p['assigned_bed'])] = p
+            admitted_by_id[p['_id']] = p
+
+    # Batch fetch all patients we need
+    patients_map = {}
+    if patient_ids:
+        oid_ids = []
+        str_ids = []
+        for pid in patient_ids:
+            try:
+                oid_ids.append(ObjectId(pid))
+            except Exception:
+                str_ids.append(pid)
+        if oid_ids:
+            for p in patients_collection.find({'_id': {'$in': oid_ids}}):
+                p['_id'] = str(p['_id'])
+                p['check_in_time'] = p['check_in_time'].isoformat() if p.get('check_in_time') else None
+                patients_map[p['_id']] = p
+        patients_map.update({p['_id']: p for p in admitted_by_id.values()})
+
+    # Collect all staff IDs from all patients (batch lookup)
+    staff_ids = set()
+    for p in patients_map.values():
+        for did in p.get('assigned_doctors', []):
+            staff_ids.add(did)
+        for nid in p.get('assigned_nurses', []):
+            staff_ids.add(nid)
+
+    staff_map = {}
+    if staff_ids:
+        oid_staff = []
+        str_staff = []
+        for sid in staff_ids:
+            try:
+                oid_staff.append(ObjectId(sid))
+            except Exception:
+                str_staff.append(sid)
+        if oid_staff:
+            for s in staff_collection.find({'_id': {'$in': oid_staff}}):
+                staff_map[str(s['_id'])] = s.get('name', 'Unknown')
+        # String IDs fallback (unlikely but safe)
+        for sid in str_staff:
+            s = staff_collection.find_one({'_id': sid})
+            if s:
+                staff_map[sid] = s.get('name', 'Unknown')
+
+    # Build a set of admitted patient IDs for validation
+    admitted_patient_ids = set(admitted_by_id.keys())
+    # Map patient_id -> assigned_bed_number for validation
+    admitted_bed_map = {}
+    for pid, p in admitted_by_id.items():
+        if p.get('assigned_bed'):
+            admitted_bed_map[pid] = str(p['assigned_bed'])
+
+    # Enrich each bed
+    for b in beds:
+        patient = None
+        pid = b.get('patient_id')
+        bed_num = str(b.get('bed_number', ''))
+
+        # Validate: only consider the bed occupied if the patient_id points
+        # to a patient who is actually admitted AND this is their assigned bed
+        if pid and pid in admitted_patient_ids:
+            assigned_bed = admitted_bed_map.get(pid)
+            if assigned_bed and assigned_bed == bed_num:
+                # This is the correct assigned bed
+                patient = admitted_by_id[pid]
+            elif not assigned_bed:
+                # Patient is admitted but has no assigned bed yet - allow fallback matching
+                patient = admitted_by_bed_num.get(bed_num)
+            # else: patient is admitted to a DIFFERENT bed -> this bed is stale
+
+        if not patient:
+            # Fallback: match by bed_number -> admitted patient
+            patient = admitted_by_bed_num.get(bed_num)
+
+        # --- Clean up stale bed data ---
+        # If bed claims to be occupied but no admitted patient matched,
+        # clear the stale data in the DB and mark the bed available
+        if b.get('status') == 'occupied' and not patient:
+            try:
+                beds_collection.update_one(
+                    {'_id': ObjectId(b['_id'])},
+                    {'$set': {
+                        'patient_id': None,
+                        'is_occupied': False,
+                        'status': 'available',
+                        'last_updated': datetime.now()
+                    }}
+                )
+            except Exception as cleanup_err:
+                print(f"[Beds] Cleanup error for bed {b['_id']}: {cleanup_err}")
+            b['patient_id'] = None
+            b['is_occupied'] = False
+            b['status'] = 'available'
+
+        if patient:
+            doctors = [staff_map.get(d, 'Unknown') for d in patient.get('assigned_doctors', [])]
+            nurses = [staff_map.get(n, 'Unknown') for n in patient.get('assigned_nurses', [])]
+            b['patient_info'] = {
+                '_id': patient.get('_id', ''),
+                'name': patient.get('name', 'Unknown'),
+                'phone': patient.get('phone', ''),
+                'symptoms': patient.get('symptoms', []),
+                'triage_category': patient.get('triage_category', 'unknown'),
+                'status': patient.get('status', 'unknown'),
+                'check_in_time': patient.get('check_in_time'),
+                'doctors': doctors,
+                'nurses': nurses,
+            }
+        else:
+            b['patient_info'] = None
+    return beds
+
+def get_cached_beds():
+    """Return beds payload, using cache if fresh, otherwise rebuild."""
+    now = time.time()
+    with _beds_cache_lock:
+        if _beds_cache['data'] is not None and (now - _beds_cache['ts']) < BEDS_CACHE_TTL:
+            return _beds_cache['data']
+    data = _build_beds_payload()
+    with _beds_cache_lock:
+        _beds_cache['data'] = data
+        _beds_cache['ts'] = time.time()
+    return data
 
 def init_database():
     wings_collection = db['wings']
@@ -57,7 +226,8 @@ except Exception as e:
                     'bed_number': bed_num,
                     'type': bed_types.get(wing, 'general'),
                     'wing': wing,
-                    'status': random.choice(['available', 'occupied', 'cleaning']),
+                    'status': 'available',
+                    'is_occupied': False,
                     'patient_id': None,
                     'last_updated': datetime.now()
                 })
@@ -167,12 +337,6 @@ def staff_page():
         return redirect('/login')
     return render_template('staff.html', user_role=session.get('user_role'))
 
-@app.route('/condition-x')
-def condition_x():
-    if not require_login():
-        return redirect('/login')
-    return render_template('condition_x.html', user_role=session.get('user_role'))
-
 @app.route('/settings')
 def settings_page():
     if not require_login():
@@ -181,11 +345,17 @@ def settings_page():
         return redirect('/dashboard')
     return render_template('settings.html', user_role=session.get('user_role'))
 
+@app.route('/waiting-room')
+def waiting_room_page():
+    if not require_login():
+        return redirect('/login')
+    return render_template('waiting_room.html', user_role=session.get('user_role'))
+
 @app.route('/all-patients')
 def all_patients_page():
     if not require_login():
         return redirect('/login')
-    return render_template('waiting_room.html', user_role=session.get('user_role'))
+    return render_template('all_patients.html', user_role=session.get('user_role'))
 
 @app.route('/bed-qr')
 def bed_qr_page():
@@ -204,6 +374,7 @@ def bed_update(bed_id):
             {'_id': ObjectId(bed_id)},
             {'$set': {'status': 'available', 'last_updated': datetime.now()}}
         )
+        invalidate_beds_cache()
         return render_template('bed_qr.html', success=f'Bed {bed["bed_number"]} marked as available!', bed=bed, user_role=session.get('user_role'))
     elif bed.get('status') == 'available':
         return render_template('bed_qr.html', info=f'Bed {bed["bed_number"]} is already available', bed=bed, user_role=session.get('user_role'))
@@ -368,6 +539,7 @@ def configure_beds():
     if beds:
         beds_collection.insert_many(beds)
     
+    invalidate_beds_cache()
     return jsonify({'success': True, 'beds_created': count, 'wing': wing_name})
 
 @app.route('/api/triage-questions')
@@ -412,14 +584,27 @@ def submit_triage():
         
         result = patients_collection.insert_one(patient)
         patient['_id'] = str(result.inserted_id)
+        patient_id = str(result.inserted_id)
         
         triage_logs_collection.insert_one({
-            'patient_id': str(result.inserted_id),
+            'patient_id': patient_id,
             'category': triage_category,
             'timestamp': datetime.now(),
             'symptoms': symptoms
         })
         
+        # Trigger AI analysis in background thread
+        if ai_client:
+            patient_doc = patients_collection.find_one({'_id': ObjectId(patient_id)})
+            if patient_doc:
+                thread = threading.Thread(
+                    target=generate_ai_analysis_async,
+                    args=(patient_id, patient_doc)
+                )
+                thread.daemon = True
+                thread.start()
+        
+        invalidate_beds_cache()
         return jsonify({
             'success': True,
             'patient': patient,
@@ -436,15 +621,6 @@ def submit_triage():
 def mark_arrived():
     data = request.json
     patient_id = data.get('patient_id')
-        # Trigger AI analysis in background thread
-    if ai_client:
-        thread = threading.Thread(
-            target=generate_ai_analysis_async,
-            args=(str(result.inserted_id), patient)
-        )
-        thread.daemon = True
-        thread.start()
-        
     
     if not patient_id:
         return jsonify({'success': False, 'error': 'Patient ID required'})
@@ -465,6 +641,18 @@ def mark_arrived():
         }}
     )
     
+    # Trigger AI analysis in background thread
+    if ai_client:
+        patient = patients_collection.find_one({'_id': ObjectId(patient_id)})
+        if patient:
+            thread = threading.Thread(
+                target=generate_ai_analysis_async,
+                args=(patient_id, patient)
+            )
+            thread.daemon = True
+            thread.start()
+    
+    invalidate_beds_cache()
     return jsonify({'success': True, 'queue_number': arrived_count + 1})
 
 @app.route('/api/arrived-patients', methods=['GET'])
@@ -532,12 +720,96 @@ def add_to_waiting_room():
     }
     
     result = patients_collection.insert_one(patient)
+    patient_id = str(result.inserted_id)
     
+    # Trigger AI analysis in background thread
+    if ai_client:
+        patient['_id'] = result.inserted_id
+        thread = threading.Thread(
+            target=generate_ai_analysis_async,
+            args=(patient_id, patient)
+        )
+        thread.daemon = True
+        thread.start()
+    
+    invalidate_beds_cache()
     return jsonify({
         'success': True,
-        'patient_id': str(result.inserted_id),
+        'patient_id': patient_id,
         'queue_number': arrived_count + 1
     })
+
+def _auto_assign_staff(patient_id, patient):
+    """Auto-assign the least-busy doctor and up to 3 nurses to a patient.
+    Returns (assigned_doctor_id_or_None, [assigned_nurse_ids]).
+    Idempotent: skips assignment if the patient already has both a doctor and nurses."""
+    if patient.get('assigned_doctors') and patient.get('assigned_nurses'):
+        return None, []
+
+    max_patients_per_staff = 100
+    max_nurses_per_patient = 3
+
+    # --- Doctor (pick the one with fewest active patients) ---
+    available_doctors = list(staff_collection.find({
+        'role': 'Doctor',
+        'status': {'$ne': 'off-duty'}
+    }))
+    for doc in available_doctors:
+        doc_str_id = str(doc['_id'])
+        doc['current_count'] = patients_collection.count_documents({
+            'assigned_doctors': doc_str_id,
+            'status': {'$ne': 'discharged'}
+        })
+    available_doctors = [d for d in available_doctors if d['current_count'] < max_patients_per_staff]
+    available_doctors.sort(key=lambda x: x['current_count'])
+
+    assigned_doctor_id = None
+    if not patient.get('assigned_doctors') and available_doctors:
+        best_doc = available_doctors[0]
+        assigned_doctor_id = str(best_doc['_id'])
+        patients_collection.update_one(
+            {'_id': ObjectId(patient_id)},
+            {'$set': {'assigned_doctors': [assigned_doctor_id]}}
+        )
+        staff_collection.update_one(
+            {'_id': best_doc['_id']},
+            {'$set': {'status': 'busy'}}
+        )
+
+    # --- Nurses (fill up to max_nurses_per_patient with least-busy nurses) ---
+    available_nurses = list(staff_collection.find({
+        'role': 'Nurse',
+        'status': {'$ne': 'off-duty'}
+    }))
+    for nurse in available_nurses:
+        nurse_str_id = str(nurse['_id'])
+        nurse['current_count'] = patients_collection.count_documents({
+            'assigned_nurses': nurse_str_id,
+            'status': {'$ne': 'discharged'}
+        })
+    available_nurses = [n for n in available_nurses if n['current_count'] < max_patients_per_staff]
+    available_nurses.sort(key=lambda x: x['current_count'])
+
+    current_nurses = len(patient.get('assigned_nurses', []))
+    nurses_to_assign = min(max_nurses_per_patient - current_nurses, len(available_nurses))
+
+    assigned_nurse_ids = []
+    for i in range(nurses_to_assign):
+        nurse = available_nurses[i]
+        nurse_id = str(nurse['_id'])
+        patients_collection.update_one(
+            {'_id': ObjectId(patient_id)},
+            {'$push': {'assigned_nurses': nurse_id}}
+        )
+        assigned_nurse_ids.append(nurse_id)
+        if current_nurses + i + 1 >= 1:
+            staff_collection.update_one(
+                {'_id': nurse['_id']},
+                {'$set': {'status': 'busy'}}
+            )
+
+    return assigned_doctor_id, assigned_nurse_ids
+
 
 @app.route('/api/auto-assign/<patient_id>', methods=['POST'])
 def auto_assign(patient_id):
@@ -545,70 +817,7 @@ def auto_assign(patient_id):
     if not patient:
         return jsonify({'success': False, 'error': 'Patient not found'})
     
-    if patient.get('assigned_doctors') and patient.get('assigned_nurses'):
-        return jsonify({'success': True, 'message': 'Already assigned'})
-    
-    max_patients_per_staff = 100
-    max_nurses_per_patient = 3
-    
-    available_doctors = list(staff_collection.find({
-        'role': 'Doctor',
-        'status': {'$ne': 'off-duty'}
-    }))
-    
-    for doc in available_doctors:
-        doc_str_id = str(doc['_id'])
-        doc['current_count'] = patients_collection.count_documents({
-            'assigned_doctors': doc_str_id,
-            'status': {'$ne': 'discharged'}
-        })
-    
-    available_doctors = [d for d in available_doctors if d['current_count'] < max_patients_per_staff]
-    available_doctors.sort(key=lambda x: x['current_count'])
-    
-    assigned_doctor = None
-    if available_doctors:
-        assigned_doctor = available_doctors[0]
-        patients_collection.update_one(
-            {'_id': ObjectId(patient_id)},
-            {'$set': {'assigned_doctors': [str(assigned_doctor['_id'])]}}
-        )
-        staff_collection.update_one(
-            {'_id': assigned_doctor['_id']},
-            {'$set': {'status': 'busy'}}
-        )
-    
-    available_nurses = list(staff_collection.find({
-        'role': 'Nurse',
-        'status': {'$ne': 'off-duty'}
-    }))
-    
-    for nurse in available_nurses:
-        nurse_str_id = str(nurse['_id'])
-        nurse['current_count'] = patients_collection.count_documents({
-            'assigned_nurses': nurse_str_id,
-            'status': {'$ne': 'discharged'}
-        })
-    
-    available_nurses = [n for n in available_nurses if n['current_count'] < max_patients_per_staff]
-    available_nurses.sort(key=lambda x: x['current_count'])
-    
-    current_nurses = len(patient.get('assigned_nurses', []))
-    nurses_to_assign = min(max_nurses_per_patient - current_nurses, len(available_nurses))
-    
-    assigned_nurses = []
-    for i in range(nurses_to_assign):
-        nurse = available_nurses[i]
-        patients_collection.update_one(
-            {'_id': ObjectId(patient_id)},
-            {'$push': {'assigned_nurses': str(nurse['_id'])}}
-        )
-        assigned_nurses.append(str(nurse['_id']))
-        if current_nurses + i + 1 >= 1:
-            staff_collection.update_one(
-                {'_id': nurse['_id']},
-                {'$set': {'status': 'busy'}}
-            )
+    assigned_doctor_id, assigned_nurse_ids = _auto_assign_staff(patient_id, patient)
     
     triage_category = patient.get('triage_category', 'simple')
     wing_priority = {
@@ -646,10 +855,11 @@ def auto_assign(patient_id):
         )
         bed_assigned = bed_number
     
+    invalidate_beds_cache()
     return jsonify({
         'success': True,
-        'assigned_doctor': str(assigned_doctor['_id']) if assigned_doctor else None,
-        'assigned_nurses': assigned_nurses,
+        'assigned_doctor': assigned_doctor_id,
+        'assigned_nurses': assigned_nurse_ids,
         'assigned_bed': bed_assigned
     })
 
@@ -669,6 +879,16 @@ def categorize_patient(symptoms, breathing_trouble):
     else:
         return 'simple'
 
+
+def calculate_triage_category(patient_data):
+    """Calculate triage category from a patient dict (used by update_patient)."""
+    symptoms = patient_data.get('symptoms', [])
+    breathing = patient_data.get('breathing_trouble', False)
+    # Normalize breathing_trouble: could be bool or string
+    if isinstance(breathing, bool):
+        breathing = 'yes' if breathing else 'no'
+    return categorize_patient(symptoms, breathing)
+
 @app.route('/api/patients')
 def get_patients():
     patients = list(patients_collection.find({'status': {'$ne': 'discharged'}}).sort('check_in_time', -1))
@@ -679,60 +899,129 @@ def get_patients():
 
 @app.route('/api/patients/<patient_id>', methods=['PUT'])
 def update_patient(patient_id):
+    """Update patient information, status, and symptoms.
+    Doctors can change name, age, gender, phone, symptoms, status, triage_category."""
+    try:
+        patient = patients_collection.find_one({'_id': ObjectId(patient_id)})
+    except Exception:
+        return jsonify({'success': False, 'error': 'Invalid patient ID'}), 400
+    if not patient:
+        return jsonify({'success': False, 'error': 'Patient not found'}), 404
+
     data = request.json
+    allowed_fields = [
+        'name', 'age', 'gender', 'phone', 'symptoms', 'duration',
+        'breathing_trouble', 'family_history', 'substance_use', 'sexually_active',
+        'medications', 'triage_category', 'status', 'notes'
+    ]
+
+    update_fields = {}
+    for field in allowed_fields:
+        if field in data:
+            update_fields[field] = data[field]
+
+    if not update_fields:
+        return jsonify({'success': False, 'error': 'No valid fields to update'}), 400
+
+    # Handle status change
+    new_status = update_fields.get('status')
+    old_status = patient.get('status')
+
+    if new_status and new_status != old_status:
+        update_fields['status'] = new_status
+
+        # If changing TO admitted, try to assign a bed if not already assigned
+        if new_status == 'admitted' and not patient.get('assigned_bed'):
+            available_bed = beds_collection.find_one({'status': 'available'})
+            if available_bed:
+                beds_collection.update_one(
+                    {'_id': available_bed['_id']},
+                    {'$set': {
+                        'status': 'occupied',
+                        'is_occupied': True,
+                        'patient_id': patient_id,
+                        'last_updated': datetime.now()
+                    }}
+                )
+                update_fields['assigned_bed'] = available_bed['bed_number']
+
+        # If changing AWAY from admitted, free the bed
+        if old_status == 'admitted' and new_status != 'admitted' and patient.get('assigned_bed'):
+            beds_collection.update_many(
+                {'patient_id': patient_id},
+                {'$set': {
+                    'status': 'available',
+                    'is_occupied': False,
+                    'patient_id': None,
+                    'last_updated': datetime.now()
+                }}
+            )
+            update_fields['assigned_bed'] = None
+
+            # Free assigned staff if discharging
+            if new_status == 'discharged':
+                for doc_id in patient.get('assigned_doctors', []):
+                    try:
+                        staff_collection.update_one(
+                            {'_id': ObjectId(doc_id)},
+                            {'$set': {'status': 'available', 'current_patient': None}}
+                        )
+                    except Exception:
+                        pass
+                for nurse_id in patient.get('assigned_nurses', []):
+                    try:
+                        staff_collection.update_one(
+                            {'_id': ObjectId(nurse_id)},
+                            {'$set': {'status': 'available', 'current_patient': None}}
+                        )
+                    except Exception:
+                        pass
+                update_fields['discharge_time'] = datetime.now().isoformat()
+                update_fields['assigned_doctors'] = []
+                update_fields['assigned_nurses'] = []
+
+    # Recalculate triage if symptoms or related fields changed
+    triage_fields = {'symptoms', 'duration', 'breathing_trouble', 'family_history',
+                     'substance_use', 'sexually_active'}
+    if triage_fields.intersection(set(update_fields.keys())):
+        # Merge current patient data with updates for recalculation
+        merged = dict(patient)
+        merged.update(update_fields)
+        new_category = calculate_triage_category(merged)
+        if new_category and new_category != patient.get('triage_category'):
+            update_fields['triage_category'] = new_category
+
+    # If triage_category was explicitly set, use that
+    if 'triage_category' in data and data['triage_category'] in ['simple', 'attention', 'emergency', 'critical']:
+        update_fields['triage_category'] = data['triage_category']
+
     patients_collection.update_one(
         {'_id': ObjectId(patient_id)},
-        {'$set': data}
+        {'$set': update_fields}
     )
-    return jsonify({'success': True})
+
+    invalidate_beds_cache()
+    return jsonify({'success': True, 'updated_fields': list(update_fields.keys())})
+
+
+@app.route('/api/patients/<patient_id>', methods=['GET'])
+def get_single_patient(patient_id):
+    """Get a single patient by ID."""
+    try:
+        patient = patients_collection.find_one({'_id': ObjectId(patient_id)})
+    except Exception:
+        return jsonify({'success': False, 'error': 'Invalid patient ID'}), 400
+    if not patient:
+        return jsonify({'success': False, 'error': 'Patient not found'}), 404
+    patient['_id'] = str(patient['_id'])
+    patient['check_in_time'] = patient['check_in_time'].isoformat() if patient.get('check_in_time') else None
+    if patient.get('discharge_time') and isinstance(patient['discharge_time'], datetime):
+        patient['discharge_time'] = patient['discharge_time'].isoformat()
+    return jsonify(patient)
 
 @app.route('/api/beds')
 def get_beds():
-    beds = list(beds_collection.find())
-    for b in beds:
-        b['_id'] = str(b['_id'])
-        b['last_updated'] = b['last_updated'].isoformat() if b.get('last_updated') else None
-        
-        patient = None
-        if b.get('patient_id'):
-            try:
-                patient = patients_collection.find_one({'_id': ObjectId(b['patient_id'])})
-            except:
-                patient = patients_collection.find_one({'_id': b['patient_id']})
-        
-        if not patient and b.get('bed_number'):
-            patient = patients_collection.find_one({'assigned_bed': b['bed_number'], 'status': 'admitted'})
-            if not patient:
-                patient = patients_collection.find_one({'assigned_bed': str(b['_id']), 'status': 'admitted'})
-        
-        if patient:
-            b['patient_info'] = {
-                'name': patient.get('name', 'Unknown'),
-                'phone': patient.get('phone', ''),
-                'symptoms': patient.get('symptoms', []),
-                'triage_category': patient.get('triage_category', 'unknown'),
-                'status': patient.get('status', 'unknown'),
-                'check_in_time': patient.get('check_in_time').isoformat() if patient.get('check_in_time') else None
-            }
-            doctors = []
-            nurses = []
-            for doc_id in patient.get('assigned_doctors', []):
-                try:
-                    doc = staff_collection.find_one({'_id': ObjectId(doc_id)})
-                except:
-                    doc = staff_collection.find_one({'_id': doc_id})
-                if doc:
-                    doctors.append(doc.get('name', 'Unknown'))
-            for nurse_id in patient.get('assigned_nurses', []):
-                try:
-                    nurse = staff_collection.find_one({'_id': ObjectId(nurse_id)})
-                except:
-                    nurse = staff_collection.find_one({'_id': nurse_id})
-                if nurse:
-                    nurses.append(nurse.get('name', 'Unknown'))
-            b['patient_info']['doctors'] = doctors
-            b['patient_info']['nurses'] = nurses
-    return jsonify(beds)
+    return jsonify(get_cached_beds())
 
 @app.route('/api/beds/<bed_id>', methods=['PUT'])
 def update_bed(bed_id):
@@ -742,16 +1031,19 @@ def update_bed(bed_id):
         {'_id': ObjectId(bed_id)},
         {'$set': data}
     )
+    invalidate_beds_cache()
     return jsonify({'success': True})
 
 @app.route('/api/beds/<bed_id>', methods=['DELETE'])
 def delete_bed(bed_id):
     beds_collection.delete_one({'_id': ObjectId(bed_id)})
+    invalidate_beds_cache()
     return jsonify({'success': True})
 
 @app.route('/api/beds-by-wing/<wing_name>', methods=['DELETE'])
 def delete_beds_by_wing(wing_name):
     result = beds_collection.delete_many({'wing': wing_name})
+    invalidate_beds_cache()
     return jsonify({'success': True, 'deleted_count': result.deleted_count})
 
 @app.route('/api/staff')
@@ -778,6 +1070,7 @@ def update_staff(staff_id):
         {'_id': ObjectId(staff_id)},
         {'$set': data}
     )
+    invalidate_beds_cache()
     return jsonify({'success': True})
 
 @app.route('/api/staff', methods=['POST'])
@@ -810,11 +1103,13 @@ def create_staff():
         'current_patient': None
     })
     
+    invalidate_beds_cache()
     return jsonify({'success': True, '_id': str(result.inserted_id), 'staff_id': staff_id})
 
 @app.route('/api/staff/<staff_id>', methods=['DELETE'])
 def delete_staff(staff_id):
     staff_collection.delete_one({'_id': ObjectId(staff_id)})
+    invalidate_beds_cache()
     return jsonify({'success': True})
 
 @app.route('/api/assign-bed', methods=['POST'])
@@ -833,7 +1128,16 @@ def assign_bed():
         {'$set': {'status': 'occupied', 'patient_id': patient_id, 'last_updated': datetime.now()}}
     )
     
-    return jsonify({'success': True})
+    # Auto-assign a doctor and nurses when a patient gets a bed
+    patient = patients_collection.find_one({'_id': ObjectId(patient_id)})
+    assigned_doctor_id, assigned_nurse_ids = _auto_assign_staff(patient_id, patient)
+    
+    invalidate_beds_cache()
+    return jsonify({
+        'success': True,
+        'assigned_doctor': assigned_doctor_id,
+        'assigned_nurses': assigned_nurse_ids
+    })
 
 @app.route('/api/assign-staff', methods=['POST'])
 def assign_staff():
@@ -851,6 +1155,7 @@ def assign_staff():
         {'$set': {'status': 'busy', 'current_patient': patient_id}}
     )
     
+    invalidate_beds_cache()
     return jsonify({'success': True})
 
 @app.route('/api/discharge', methods=['POST'])
@@ -896,24 +1201,9 @@ def discharge_patient():
         {'$set': {'status': 'discharged', 'discharge_time': datetime.now()}}
     )
     
+    invalidate_beds_cache()
     return jsonify({'success': True})
 
-@app.route('/api/condition-x-status')
-def condition_x_status():
-    one_hour_ago = datetime.now() - timedelta(hours=1)
-    recent_logs = list(triage_logs_collection.find({'timestamp': {'$gte': one_hour_ago}}))
-    
-    breathing_count = sum(1 for log in recent_logs if log.get('symptoms') and 'breathing' in ' '.join(log['symptoms']).lower())
-    total_triages = len(recent_logs)
-    
-    spike_detected = breathing_count >= 3 and total_triages >= 5
-    
-    category_counts = {'simple': 0, 'attention': 0, 'emergency': 0, 'critical': 0}
-    for log in recent_logs:
-        cat = log.get('category', 'simple')
-        category_counts[cat] = category_counts.get(cat, 0) + 1
-    
-    return jsonify({
 def generate_ai_analysis(patient):
     """Generate AI-powered clinical analysis for a patient."""
     if not ai_client:
@@ -1113,6 +1403,22 @@ def ai_status():
     })
 
 
+@app.route('/api/stats')
+def get_stats():
+    total_patients = patients_collection.count_documents({})
+    waiting = patients_collection.count_documents({'status': 'waiting'})
+    admitted = patients_collection.count_documents({'status': 'admitted'})
+    discharged = patients_collection.count_documents({'status': 'discharged'})
+
+    available_beds = beds_collection.count_documents({'status': 'available'})
+    occupied_beds = beds_collection.count_documents({'status': 'occupied'})
+    cleaning_beds = beds_collection.count_documents({'status': 'cleaning'})
+
+    available_staff = staff_collection.count_documents({'status': 'available'})
+    busy_staff = staff_collection.count_documents({'status': 'busy'})
+
+    return jsonify({
+        'patients': {
             'total': total_patients,
             'waiting': waiting,
             'admitted': admitted,
