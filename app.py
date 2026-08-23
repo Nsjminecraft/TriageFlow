@@ -20,7 +20,6 @@ patients_collection = db['patients']
 beds_collection = db['beds']
 staff_collection = db['staff']
 triage_logs_collection = db['triage_logs']
-ai_analyses_collection = db['ai_analyses']
 
 def init_database():
     wings_collection = db['wings']
@@ -899,6 +898,22 @@ def discharge_patient():
     
     return jsonify({'success': True})
 
+@app.route('/api/condition-x-status')
+def condition_x_status():
+    one_hour_ago = datetime.now() - timedelta(hours=1)
+    recent_logs = list(triage_logs_collection.find({'timestamp': {'$gte': one_hour_ago}}))
+    
+    breathing_count = sum(1 for log in recent_logs if log.get('symptoms') and 'breathing' in ' '.join(log['symptoms']).lower())
+    total_triages = len(recent_logs)
+    
+    spike_detected = breathing_count >= 3 and total_triages >= 5
+    
+    category_counts = {'simple': 0, 'attention': 0, 'emergency': 0, 'critical': 0}
+    for log in recent_logs:
+        cat = log.get('category', 'simple')
+        category_counts[cat] = category_counts.get(cat, 0) + 1
+    
+    return jsonify({
 def generate_ai_analysis(patient):
     """Generate AI-powered clinical analysis for a patient."""
     if not ai_client:
@@ -1098,22 +1113,6 @@ def ai_status():
     })
 
 
-@app.route('/api/stats')
-def get_stats():
-    total_patients = patients_collection.count_documents({})
-    waiting = patients_collection.count_documents({'status': 'waiting'})
-    admitted = patients_collection.count_documents({'status': 'admitted'})
-    discharged = patients_collection.count_documents({'status': 'discharged'})
-
-    available_beds = beds_collection.count_documents({'status': 'available'})
-    occupied_beds = beds_collection.count_documents({'status': 'occupied'})
-    cleaning_beds = beds_collection.count_documents({'status': 'cleaning'})
-
-    available_staff = staff_collection.count_documents({'status': 'available'})
-    busy_staff = staff_collection.count_documents({'status': 'busy'})
-
-    return jsonify({
-        'patients': {
             'total': total_patients,
             'waiting': waiting,
             'admitted': admitted,

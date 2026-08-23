@@ -616,8 +616,7 @@
                 analysis.red_flags.forEach(function(r) { html += '<li>⚠️ ' + r + '</li>'; });
                 html += '</ul></div>';
             }
-            var modelLabel = analysis.model_used ? 'Powered by ' + analysis.model_used : 'AI-generated';
-            html += '<p class="text-xs text-gray-400 text-center mt-2"><i class="fa-solid fa-robot mr-1"></i>' + modelLabel + ' clinical decision support • For medical staff reference only</p>';
+            html += '<p class="text-xs text-gray-400 text-center mt-2"><i class="fa-solid fa-robot mr-1"></i>AI-generated clinical decision support • For medical staff reference only</p>';
             document.getElementById('aiAnalysisContent').innerHTML = html;
         }
 
